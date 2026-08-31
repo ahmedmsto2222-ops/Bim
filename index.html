@@ -3,9 +3,82 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>تطبيق السوبرماركت المحلي</title>
+    <title>تطبيق السوبرماركت المشترك (سحابي)</title>
     <!-- استيراد مكتبة قراءة الباركود المباشرة -->
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    
+    <!-- استيراد مكتبات Firebase (الإصدار 10 المتوافق مع الويب) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getDatabase, ref, set, push, onValue, remove, update } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+        // ==========================================
+        // ضع إعدادات مشروعك في Firebase هنا 👇
+        // ==========================================
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+            databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_PROJECT_ID.appspot.com",
+            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+
+        // تهيئة Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        // متغيرات عامة
+        window.products = [];
+        window.currentInvoice = [];
+        window.html5QrCode = null;
+        window.isScanningActive = false;
+        window.targetInputField = null;
+
+        // جلب البيانات بالحياة الفورية (Real-time sync) من سحابة Firebase
+        const productsRef = ref(db, 'supermarket_products');
+        onValue(productsRef, (snapshot) => {
+            const data = snapshot.val();
+            window.products = [];
+            if (data) {
+                Object.keys(data).forEach(key => {
+                    window.products.push({ id: key, ...data[key] });
+                });
+            }
+            if (typeof renderProducts === 'function') renderProducts();
+        });
+
+        // دوال الحفظ والتعديل والحذف السحابية
+        window.saveProductToCloud = function(productData, editId) {
+            if (!editId) {
+                // إضافة منتج جديد كلياً
+                const newRef = push(productsRef);
+                set(newRef, productData).then(() => {
+                    alert('✅ تم حفظ المنتج ومشاركته مع شريكك بنجاح!');
+                    clearForm();
+                    switchTab('displayTab', document.querySelectorAll('.tab-btn')[2]);
+                }).catch(err => alert('خطأ في الحفظ: ' + err.message));
+            } else {
+                // تعديل منتج موجود
+                const itemRef = ref(db, 'supermarket_products/' + editId);
+                update(itemRef, productData).then(() => {
+                    alert('✅ تم تعديل المنتج وتحديثه لدى شريكك بنجاح!');
+                    clearForm();
+                    switchTab('displayTab', document.querySelectorAll('.tab-btn')[2]);
+                }).catch(err => alert('خطأ في التعديل: ' + err.message));
+            }
+        };
+
+        window.deleteProductFromCloud = function(id) {
+            if (confirm('هل أنت متأكد من حذف هذا المنتج من عند الجميع؟')) {
+                const itemRef = ref(db, 'supermarket_products/' + id);
+                remove(itemRef).then(() => {
+                    alert('🗑️ تم الحذف بنجاح.');
+                });
+            }
+        };
+    </script>
     
     <style>
         :root {
@@ -213,16 +286,6 @@
         button.btn-edit { background-color: var(--warning); color: white; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; }
         button.btn-delete { background-color: var(--danger); color: white; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; }
 
-        #interactive-scanner-container {
-            width: 100%;
-            max-width: 400px;
-            margin: 10px auto;
-            display: none;
-            border-radius: 12px;
-            overflow: hidden;
-            border: 2px solid var(--primary);
-        }
-
         .invoice-total-card {
             background: linear-gradient(135deg, #4f46e5, #4338ca);
             color: white;
@@ -256,7 +319,7 @@
 <body>
 
 <div class="container">
-    <h2>إدارة السوبرماركت المحلي 🛒</h2>
+    <h2>سوبرماركت الشركاء (متصل بالسحابة) 🛒</h2>
     
     <div class="tabs">
         <button class="tab-btn active" onclick="switchTab('posTab', this)">🛒 الكاشير والفاتورة</button>
@@ -316,7 +379,6 @@
             </div>
         </div>
 
-        <!-- حاوية الكاميرا الخاصة بقسم الإضافة -->
         <div id="add-scanner-container" style="width: 100%; max-width: 400px; margin: 10px auto; display: none; border-radius: 12px; overflow: hidden; border: 2px solid var(--primary);">
             <div id="reader-add"></div>
         </div>
@@ -357,7 +419,7 @@
             <input type="file" id="productImage" accept="image/*">
         </div>
         
-        <button id="saveBtn" class="btn-main" onclick="saveProduct()">حفظ المنتج محلياً</button>
+        <button id="saveBtn" class="btn-main" onclick="saveProduct()">حفظ المنتج بالسحابة</button>
     </div>
 
     <!-- 3. قسم عرض المنتجات والبحث -->
@@ -365,35 +427,23 @@
         <div class="form-group" style="margin-bottom: 15px;">
             <div style="display: flex; gap: 8px;">
                 <input type="text" id="searchInput" placeholder="🔍 ابحث بالاسم، التصنيف، أو رقم الباركود..." oninput="renderProducts()">
-                <button type="button" class="btn-camera" style="width: 140px;" onclick="toggleLiveScanner('searchInput')">مسح بالبارکود</button>
+                <button type="button" class="btn-camera" style="width: 140px;" onclick="toggleLiveScanner('searchInput')">مسح بالباركود</button>
             </div>
         </div>
 
-        <!-- حاوية الكاميرا الخاصة بقسم عرض المنتجات -->
         <div id="search-scanner-container" style="width: 100%; max-width: 400px; margin: 10px auto; display: none; border-radius: 12px; overflow: hidden; border: 2px solid var(--primary);">
             <div id="reader-search"></div>
         </div>
         <button type="button" id="stopSearchScannerBtn" style="display:none; background-color:var(--danger); color:white; border:none; padding:8px; width:100%; border-radius:8px; margin-bottom:15px; cursor:pointer;" onclick="stopLiveScanner()">إيقاف الكاميرا ❌</button>
 
         <div id="productsContainer">
-            <p style="text-align: center; color: var(--text-muted);">جاري تحميل المنتجات...</p>
+            <p style="text-align: center; color: var(--text-muted);">جاري مزامنة المنتجات من السحابة...</p>
         </div>
     </div>
 
 </div>
 
 <script>
-    let products = JSON.parse(localStorage.getItem('local_supermarket_products')) || [];
-    let currentInvoice = [];
-    let html5QrCode = null;
-    let isScanningActive = false;
-    let targetInputField = null;
-
-    function saveToLocalStorage() {
-        localStorage.setItem('local_supermarket_products', JSON.stringify(products));
-        renderProducts();
-    }
-
     function playBeepSound() {
         try {
             let AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -422,7 +472,7 @@
     }
 
     function toggleLiveScanner(mode = 'pos') {
-        targetInputField = mode;
+        window.targetInputField = mode;
         
         let containerId, readerId, stopBtnId;
         if (mode === 'pos') {
@@ -443,7 +493,7 @@
         const stopBtn = document.getElementById(stopBtnId);
         const toggleBtn = document.getElementById('scannerToggleBtn');
 
-        if (isScanningActive) {
+        if (window.isScanningActive) {
             stopLiveScanner();
             return;
         }
@@ -452,14 +502,14 @@
         stopBtn.style.display = 'block';
         if(toggleBtn && mode === 'pos') toggleBtn.innerText = 'إيقاف الكاميرا الحية';
 
-        html5QrCode = new Html5Qrcode(readerId);
+        window.html5QrCode = new Html5Qrcode(readerId);
         const config = { fps: 15, qrbox: { width: 250, height: 150 } };
 
-        html5QrCode.start({ facingMode: "environment" }, config, (decodedText) => {
+        window.html5QrCode.start({ facingMode: "environment" }, config, (decodedText) => {
             playBeepSound();
             handleScannedBarcode(decodedText);
         }, (err) => {}).then(() => {
-            isScanningActive = true;
+            window.isScanningActive = true;
         }).catch(err => {
             alert('تعذر تشغيل الكاميرا، تأكد من إعطاء الصلاحية.');
             stopLiveScanner();
@@ -467,8 +517,8 @@
     }
 
     function stopLiveScanner() {
-        if (html5QrCode && isScanningActive) {
-            html5QrCode.stop().then(() => {
+        if (window.html5QrCode && window.isScanningActive) {
+            window.html5QrCode.stop().then(() => {
                 resetScannerUI();
             }).catch(err => { resetScannerUI(); });
         } else {
@@ -477,7 +527,7 @@
     }
 
     function resetScannerUI() {
-        isScanningActive = false;
+        window.isScanningActive = false;
         document.getElementById('interactive-scanner-container').style.display = 'none';
         document.getElementById('stopScannerBtn').style.display = 'none';
         document.getElementById('add-scanner-container').style.display = 'none';
@@ -487,34 +537,34 @@
         
         const toggleBtn = document.getElementById('scannerToggleBtn');
         if(toggleBtn) toggleBtn.innerText = '📷 تشغيل كاميرا المسح الفوري';
-        targetInputField = null;
+        window.targetInputField = null;
     }
 
     function handleScannedBarcode(code) {
-        if (targetInputField === 'pos') {
+        if (window.targetInputField === 'pos') {
             addProductToInvoice(code);
-        } else if (targetInputField === 'productBarcode') {
+        } else if (window.targetInputField === 'productBarcode') {
             document.getElementById('productBarcode').value = code;
             stopLiveScanner();
-        } else if (targetInputField === 'searchInput') {
+        } else if (window.targetInputField === 'searchInput') {
             document.getElementById('searchInput').value = code;
             stopLiveScanner();
-            renderProducts(); // تحديث قائمة البحث فوراً بالباركود الناتج
+            renderProducts();
         }
     }
 
     function addProductToInvoice(barcode) {
-        let foundProduct = products.find(p => p.barcode === barcode);
+        let foundProduct = window.products.find(p => p.barcode === barcode);
         if (!foundProduct) {
-            alert('❌ هذا الباركود غير مسجل محلياً: ' + barcode);
+            alert('❌ هذا الباركود غير مسجل في السحابة: ' + barcode);
             return;
         }
 
-        let existingItem = currentInvoice.find(item => item.barcode === barcode);
+        let existingItem = window.currentInvoice.find(item => item.barcode === barcode);
         if (existingItem) {
             existingItem.qty += 1;
         } else {
-            currentInvoice.push({
+            window.currentInvoice.push({
                 name: foundProduct.name,
                 price: foundProduct.singleSell || 0,
                 barcode: foundProduct.barcode,
@@ -528,7 +578,7 @@
         let container = document.getElementById('invoiceItemsContainer');
         let totalDisplay = document.getElementById('invoiceTotal');
         
-        if (currentInvoice.length === 0) {
+        if (window.currentInvoice.length === 0) {
             container.innerHTML = '<p style="text-align: center; color: var(--text-muted); padding: 15px;">السلة فارغة، قم بتوجيه الكاميرا نحو الباركود لإضافته.</p>';
             totalDisplay.innerHTML = '0.00 ₺';
             return;
@@ -536,7 +586,7 @@
 
         let totalAmount = 0;
         container.innerHTML = '';
-        currentInvoice.forEach((item, index) => {
+        window.currentInvoice.forEach((item, index) => {
             let itemTotal = item.price * item.qty;
             totalAmount += itemTotal;
             container.innerHTML += `
@@ -556,15 +606,15 @@
     }
 
     function removeFromInvoice(index) {
-        currentInvoice.splice(index, 1);
+        window.currentInvoice.splice(index, 1);
         renderInvoice();
     }
 
     function checkoutInvoice() {
-        if (currentInvoice.length === 0) return alert('الفاتورة فارغة!');
-        let total = currentInvoice.reduce((sum, item) => sum + (item.price * item.qty), 0);
+        if (window.currentInvoice.length === 0) return alert('الفاتورة فارغة!');
+        let total = window.currentInvoice.reduce((sum, item) => sum + (item.price * item.qty), 0);
         alert(`✅ تم إتمام الفاتورة بنجاح!\nالمبلغ الإجمالي المطلوب: ${total.toFixed(2)} ₺`);
-        currentInvoice = [];
+        window.currentInvoice = [];
         renderInvoice();
     }
 
@@ -600,36 +650,14 @@
         if (!name) return alert('الرجاء إدخال اسم المنتج على الأقل');
 
         let processSaving = (imgData) => {
-            if (!editDocId) {
-                let newItem = { 
-                    id: 'prod_' + Date.now(),
-                    name, category, barcode, singleBuy, singleSell, 
-                    singleProfit: singleSell - singleBuy, 
-                    bundleBuy, bundleSell, 
-                    bundleProfit: bundleSell - bundleBuy, 
-                    image: imgData || '' 
-                };
-                products.push(newItem);
-                alert('تم حفظ المنتج محلياً بنجاح!');
-            } else {
-                let p = products.find(item => item.id === editDocId);
-                if (p) {
-                    p.name = name;
-                    p.category = category;
-                    p.barcode = barcode;
-                    p.singleBuy = singleBuy;
-                    p.singleSell = singleSell;
-                    p.singleProfit = singleSell - singleBuy;
-                    p.bundleBuy = bundleBuy;
-                    p.bundleSell = bundleSell;
-                    p.bundleProfit = bundleSell - bundleBuy;
-                    if (imgData) p.image = imgData;
-                }
-                alert('تم تعديل المنتج بنجاح!');
-            }
-            saveToLocalStorage();
-            clearForm();
-            switchTab('displayTab', document.querySelectorAll('.tab-btn')[2]);
+            let productData = {
+                name, category, barcode, singleBuy, singleSell,
+                singleProfit: singleSell - singleBuy,
+                bundleBuy, bundleSell,
+                bundleProfit: bundleSell - bundleBuy,
+                image: imgData || ''
+            };
+            window.saveProductToCloud(productData, editDocId);
         };
 
         if (imageInput.files && imageInput.files[0]) {
@@ -639,18 +667,18 @@
         } else {
             let existingImage = '';
             if (editDocId) {
-                let p = products.find(item => item.id === editDocId);
+                let p = window.products.find(item => item.id === editDocId);
                 if (p) existingImage = p.image;
             }
             processSaving(existingImage);
         }
     }
 
-    function renderProducts() {
+    window.renderProducts = function() {
         let container = document.getElementById('productsContainer');
         let searchQuery = document.getElementById('searchInput').value.toLowerCase();
         
-        let filteredProducts = products.filter(p => 
+        let filteredProducts = window.products.filter(p => 
             p.name.toLowerCase().includes(searchQuery) || 
             p.category.toLowerCase().includes(searchQuery) || 
             (p.barcode && p.barcode.toLowerCase().includes(searchQuery))
@@ -683,12 +711,13 @@
                             ${imgHtml}
                             <div>
                                 <strong>${p.name}</strong> <small style="color:var(--text-muted)">(${barcodeText})</small><br>
-                                <small style="color:var(--text-muted)">سعر البيع: ${p.singleSell} ₺</small>
+                                <small style="color:var(--text-muted)">سعر القطعة: ${p.singleSell || 0} ₺ | ربح القطعة: ${p.singleProfit || 0} ₺</small><br>
+                                <small style="color:var(--text-muted)">سعر الطرد: ${p.bundleSell || 0} ₺ | ربح الطرد: ${p.bundleProfit || 0} ₺</small>
                             </div>
                         </div>
                         <div style="display:flex; gap:6px;">
                             <button class="btn-edit" onclick="editProduct('${p.id}')">تعديل</button>
-                            <button class="btn-delete" onclick="deleteProduct('${p.id}')">حذف</button>
+                            <button class="btn-delete" onclick="window.deleteProductFromCloud('${p.id}')">حذف</button>
                         </div>
                     </div>
                 `;
@@ -698,7 +727,7 @@
     }
 
     function editProduct(id) {
-        let p = products.find(item => item.id === id);
+        let p = window.products.find(item => item.id === id);
         if(!p) return;
         document.getElementById('productName').value = p.name;
         document.getElementById('productCategory').value = p.category;
@@ -708,17 +737,10 @@
         document.getElementById('bundleBuy').value = p.bundleBuy;
         document.getElementById('bundleSell').value = p.bundleSell;
         document.getElementById('editDocId').value = p.id;
-        document.getElementById('saveBtn').innerText = 'تعديل المنتج محلياً';
+        document.getElementById('saveBtn').innerText = 'تعديل المنتج بالسحابة';
         calculateSingleProfit();
         calculateBundleProfit();
         switchTab('addUnifiedTab', document.querySelectorAll('.tab-btn')[1]);
-    }
-
-    function deleteProduct(id) {
-        if(confirm('هل أنت متأكد من حذف هذا المنتج؟')) {
-            products = products.filter(item => item.id !== id);
-            saveToLocalStorage();
-        }
     }
 
     function clearForm() {
@@ -731,12 +753,10 @@
         document.getElementById('bundleSell').value = '';
         document.getElementById('productImage').value = '';
         document.getElementById('editDocId').value = '';
-        document.getElementById('saveBtn').innerText = 'حفظ المنتج محلياً';
+        document.getElementById('saveBtn').innerText = 'حفظ المنتج بالسحابة';
         document.getElementById('singleResultDisplay').innerHTML = 'ربح القطعة: 0.00 ₺';
         document.getElementById('bundleResultDisplay').innerHTML = 'ربح الطرد الكامل: 0.00 ₺';
     }
-
-    renderProducts();
 </script>
 
 </body>
