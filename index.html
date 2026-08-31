@@ -272,12 +272,12 @@
         </div>
 
         <div class="form-group">
-            <button type="button" id="scannerToggleBtn" class="btn-camera" style="background-color: var(--success); font-size: 18px; padding: 16px;" onclick="toggleLiveScanner()">
+            <button type="button" id="scannerToggleBtn" class="btn-camera" style="background-color: var(--success); font-size: 18px; padding: 16px;" onclick="toggleLiveScanner('pos')">
                 📷 تشغيل كاميرا المسح الفوري
             </button>
         </div>
 
-        <div id="interactive-scanner-container">
+        <div id="interactive-scanner-container" style="width: 100%; max-width: 400px; margin: 10px auto; display: none; border-radius: 12px; overflow: hidden; border: 2px solid var(--primary);">
             <div id="reader"></div>
         </div>
         <button type="button" id="stopScannerBtn" style="display:none; background-color:var(--danger); color:white; border:none; padding:8px; width:100%; border-radius:8px; margin-bottom:15px; cursor:pointer;" onclick="stopLiveScanner()">إيقاف الكاميرا ❌</button>
@@ -363,8 +363,18 @@
     <!-- 3. قسم عرض المنتجات والبحث -->
     <div id="displayTab" class="tab-content">
         <div class="form-group" style="margin-bottom: 15px;">
-            <input type="text" id="searchInput" placeholder="🔍 ابحث بالاسم، التصنيف، أو رقم الباركود..." oninput="renderProducts()">
+            <div style="display: flex; gap: 8px;">
+                <input type="text" id="searchInput" placeholder="🔍 ابحث بالاسم، التصنيف، أو رقم الباركود..." oninput="renderProducts()">
+                <button type="button" class="btn-camera" style="width: 140px;" onclick="toggleLiveScanner('searchInput')">مسح بالبارکود</button>
+            </div>
         </div>
+
+        <!-- حاوية الكاميرا الخاصة بقسم عرض المنتجات -->
+        <div id="search-scanner-container" style="width: 100%; max-width: 400px; margin: 10px auto; display: none; border-radius: 12px; overflow: hidden; border: 2px solid var(--primary);">
+            <div id="reader-search"></div>
+        </div>
+        <button type="button" id="stopSearchScannerBtn" style="display:none; background-color:var(--danger); color:white; border:none; padding:8px; width:100%; border-radius:8px; margin-bottom:15px; cursor:pointer;" onclick="stopLiveScanner()">إيقاف الكاميرا ❌</button>
+
         <div id="productsContainer">
             <p style="text-align: center; color: var(--text-muted);">جاري تحميل المنتجات...</p>
         </div>
@@ -411,14 +421,24 @@
         if(tabId === 'posTab') renderInvoice();
     }
 
-    function toggleLiveScanner(inputId = null) {
-        targetInputField = inputId;
+    function toggleLiveScanner(mode = 'pos') {
+        targetInputField = mode;
         
-        // تحديد أي حاوية كاميرا يجب إظهارها بناءً على مكان الاستخدام
-        const containerId = targetInputField ? 'add-scanner-container' : 'interactive-scanner-container';
-        const readerId = targetInputField ? 'reader-add' : 'reader';
-        const stopBtnId = targetInputField ? 'stopAddScannerBtn' : 'stopScannerBtn';
-        
+        let containerId, readerId, stopBtnId;
+        if (mode === 'pos') {
+            containerId = 'interactive-scanner-container';
+            readerId = 'reader';
+            stopBtnId = 'stopScannerBtn';
+        } else if (mode === 'productBarcode') {
+            containerId = 'add-scanner-container';
+            readerId = 'reader-add';
+            stopBtnId = 'stopAddScannerBtn';
+        } else if (mode === 'searchInput') {
+            containerId = 'search-scanner-container';
+            readerId = 'reader-search';
+            stopBtnId = 'stopSearchScannerBtn';
+        }
+
         const container = document.getElementById(containerId);
         const stopBtn = document.getElementById(stopBtnId);
         const toggleBtn = document.getElementById('scannerToggleBtn');
@@ -430,7 +450,7 @@
 
         container.style.display = 'block';
         stopBtn.style.display = 'block';
-        if(toggleBtn && !targetInputField) toggleBtn.innerText = 'إيقاف الكاميرا الحية';
+        if(toggleBtn && mode === 'pos') toggleBtn.innerText = 'إيقاف الكاميرا الحية';
 
         html5QrCode = new Html5Qrcode(readerId);
         const config = { fps: 15, qrbox: { width: 250, height: 150 } };
@@ -449,31 +469,37 @@
     function stopLiveScanner() {
         if (html5QrCode && isScanningActive) {
             html5QrCode.stop().then(() => {
-                isScanningActive = false;
-                document.getElementById('interactive-scanner-container').style.display = 'none';
-                document.getElementById('stopScannerBtn').style.display = 'none';
-                document.getElementById('add-scanner-container').style.display = 'none';
-                document.getElementById('stopAddScannerBtn').style.display = 'none';
-                const toggleBtn = document.getElementById('scannerToggleBtn');
-                if(toggleBtn) toggleBtn.innerText = '📷 تشغيل كاميرا المسح الفوري';
-                targetInputField = null;
-            }).catch(err => {});
+                resetScannerUI();
+            }).catch(err => { resetScannerUI(); });
         } else {
-            isScanningActive = false;
-            document.getElementById('interactive-scanner-container').style.display = 'none';
-            document.getElementById('stopScannerBtn').style.display = 'none';
-            document.getElementById('add-scanner-container').style.display = 'none';
-            document.getElementById('stopAddScannerBtn').style.display = 'none';
-            targetInputField = null;
+            resetScannerUI();
         }
     }
 
+    function resetScannerUI() {
+        isScanningActive = false;
+        document.getElementById('interactive-scanner-container').style.display = 'none';
+        document.getElementById('stopScannerBtn').style.display = 'none';
+        document.getElementById('add-scanner-container').style.display = 'none';
+        document.getElementById('stopAddScannerBtn').style.display = 'none';
+        document.getElementById('search-scanner-container').style.display = 'none';
+        document.getElementById('stopSearchScannerBtn').style.display = 'none';
+        
+        const toggleBtn = document.getElementById('scannerToggleBtn');
+        if(toggleBtn) toggleBtn.innerText = '📷 تشغيل كاميرا المسح الفوري';
+        targetInputField = null;
+    }
+
     function handleScannedBarcode(code) {
-        if (targetInputField) {
-            document.getElementById(targetInputField).value = code;
-            stopLiveScanner();
-        } else {
+        if (targetInputField === 'pos') {
             addProductToInvoice(code);
+        } else if (targetInputField === 'productBarcode') {
+            document.getElementById('productBarcode').value = code;
+            stopLiveScanner();
+        } else if (targetInputField === 'searchInput') {
+            document.getElementById('searchInput').value = code;
+            stopLiveScanner();
+            renderProducts(); // تحديث قائمة البحث فوراً بالباركود الناتج
         }
     }
 
