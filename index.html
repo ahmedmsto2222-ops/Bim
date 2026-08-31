@@ -3,12 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>تطبيق السوبرماركت المشترك</title>
+    <title>تطبيق السوبرماركت المحلي</title>
     <!-- استيراد مكتبة قراءة الباركود المباشرة -->
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
-    <!-- استيراد مكتبات Firebase السحابية -->
-    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
     
     <style>
         :root {
@@ -259,7 +256,7 @@
 <body>
 
 <div class="container">
-    <h2>إدارة السوبرماركت المشترك 🛒</h2>
+    <h2>إدارة السوبرماركت المحلي 🛒</h2>
     
     <div class="tabs">
         <button class="tab-btn active" onclick="switchTab('posTab', this)">🛒 الكاشير والفاتورة</button>
@@ -283,7 +280,7 @@
         <div id="interactive-scanner-container">
             <div id="reader"></div>
         </div>
-        <button type="button" id="stopScannerBtn" style="display:none; background-color:var(--danger); color:white; border:none; padding:8px; width:100%; border-radius:8px; margin-bottom:15px; cursor:pointer;" onclick="stopLiveScanner()">إيقاف الكاميرا المؤقتة ❌</button>
+        <button type="button" id="stopScannerBtn" style="display:none; background-color:var(--danger); color:white; border:none; padding:8px; width:100%; border-radius:8px; margin-bottom:15px; cursor:pointer;" onclick="stopLiveScanner()">إيقاف الكاميرا ❌</button>
 
         <div class="section-box">
             <div class="section-title">🧾 تفاصيل سلة الزبون الحالية</div>
@@ -315,9 +312,15 @@
             <label>رقم الباركود</label>
             <div style="display: flex; gap: 8px;">
                 <input type="text" id="productBarcode" placeholder="أدخل أو امسح الباركود">
-                <button type="button" class="btn-camera" style="width: 140px;" onclick="startQuickScanForInput('productBarcode')">مسح مباشر</button>
+                <button type="button" class="btn-camera" style="width: 140px;" onclick="toggleLiveScanner('productBarcode')">مسح مباشر</button>
             </div>
         </div>
+
+        <!-- حاوية الكاميرا الخاصة بقسم الإضافة -->
+        <div id="add-scanner-container" style="width: 100%; max-width: 400px; margin: 10px auto; display: none; border-radius: 12px; overflow: hidden; border: 2px solid var(--primary);">
+            <div id="reader-add"></div>
+        </div>
+        <button type="button" id="stopAddScannerBtn" style="display:none; background-color:var(--danger); color:white; border:none; padding:8px; width:100%; border-radius:8px; margin-bottom:15px; cursor:pointer;" onclick="stopLiveScanner()">إيقاف الكاميرا ❌</button>
 
         <div class="section-box">
             <div class="section-title">📦 البيع والشراء بالمفرد (للقطعة)</div>
@@ -354,7 +357,7 @@
             <input type="file" id="productImage" accept="image/*">
         </div>
         
-        <button id="saveBtn" class="btn-main" onclick="saveProduct()">حفظ المنتج في السحابة</button>
+        <button id="saveBtn" class="btn-main" onclick="saveProduct()">حفظ المنتج محلياً</button>
     </div>
 
     <!-- 3. قسم عرض المنتجات والبحث -->
@@ -363,40 +366,23 @@
             <input type="text" id="searchInput" placeholder="🔍 ابحث بالاسم، التصنيف، أو رقم الباركود..." oninput="renderProducts()">
         </div>
         <div id="productsContainer">
-            <p style="text-align: center; color: var(--text-muted);">جاري تحميل المنتجات المشتركة...</p>
+            <p style="text-align: center; color: var(--text-muted);">جاري تحميل المنتجات...</p>
         </div>
     </div>
 
 </div>
 
 <script>
-    // ضع معلومات مشروعك في Firebase هنا 👇
-    const firebaseConfig = {
-        apiKey: "YOUR_API_KEY",
-        authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-        projectId: "YOUR_PROJECT_ID",
-        storageBucket: "YOUR_PROJECT_ID.appspot.com",
-        messagingSenderId: "YOUR_SENDER_ID",
-        appId: "YOUR_APP_ID"
-    };
-
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.firestore();
-
-    let products = [];
+    let products = JSON.parse(localStorage.getItem('local_supermarket_products')) || [];
     let currentInvoice = [];
     let html5QrCode = null;
     let isScanningActive = false;
     let targetInputField = null;
 
-    // جلب المنتجات السحابية بشكل حي وفوري (Real-time sync)
-    db.collection("products").onSnapshot((snapshot) => {
-        products = [];
-        snapshot.forEach((doc) => {
-            products.push({ id: doc.id, ...doc.data() });
-        });
+    function saveToLocalStorage() {
+        localStorage.setItem('local_supermarket_products', JSON.stringify(products));
         renderProducts();
-    });
+    }
 
     function playBeepSound() {
         try {
@@ -427,8 +413,14 @@
 
     function toggleLiveScanner(inputId = null) {
         targetInputField = inputId;
-        const container = document.getElementById('interactive-scanner-container');
-        const stopBtn = document.getElementById('stopScannerBtn');
+        
+        // تحديد أي حاوية كاميرا يجب إظهارها بناءً على مكان الاستخدام
+        const containerId = targetInputField ? 'add-scanner-container' : 'interactive-scanner-container';
+        const readerId = targetInputField ? 'reader-add' : 'reader';
+        const stopBtnId = targetInputField ? 'stopAddScannerBtn' : 'stopScannerBtn';
+        
+        const container = document.getElementById(containerId);
+        const stopBtn = document.getElementById(stopBtnId);
         const toggleBtn = document.getElementById('scannerToggleBtn');
 
         if (isScanningActive) {
@@ -438,9 +430,9 @@
 
         container.style.display = 'block';
         stopBtn.style.display = 'block';
-        if(toggleBtn) toggleBtn.innerText = 'إيقاف الكاميرا الحية';
+        if(toggleBtn && !targetInputField) toggleBtn.innerText = 'إيقاف الكاميرا الحية';
 
-        html5QrCode = new Html5Qrcode("reader");
+        html5QrCode = new Html5Qrcode(readerId);
         const config = { fps: 15, qrbox: { width: 250, height: 150 } };
 
         html5QrCode.start({ facingMode: "environment" }, config, (decodedText) => {
@@ -454,23 +446,25 @@
         });
     }
 
-    function startQuickScanForInput(inputId) {
-        toggleLiveScanner(inputId);
-    }
-
     function stopLiveScanner() {
         if (html5QrCode && isScanningActive) {
             html5QrCode.stop().then(() => {
                 isScanningActive = false;
                 document.getElementById('interactive-scanner-container').style.display = 'none';
                 document.getElementById('stopScannerBtn').style.display = 'none';
+                document.getElementById('add-scanner-container').style.display = 'none';
+                document.getElementById('stopAddScannerBtn').style.display = 'none';
                 const toggleBtn = document.getElementById('scannerToggleBtn');
                 if(toggleBtn) toggleBtn.innerText = '📷 تشغيل كاميرا المسح الفوري';
+                targetInputField = null;
             }).catch(err => {});
         } else {
             isScanningActive = false;
             document.getElementById('interactive-scanner-container').style.display = 'none';
             document.getElementById('stopScannerBtn').style.display = 'none';
+            document.getElementById('add-scanner-container').style.display = 'none';
+            document.getElementById('stopAddScannerBtn').style.display = 'none';
+            targetInputField = null;
         }
     }
 
@@ -478,7 +472,6 @@
         if (targetInputField) {
             document.getElementById(targetInputField).value = code;
             stopLiveScanner();
-            targetInputField = null;
         } else {
             addProductToInvoice(code);
         }
@@ -487,7 +480,7 @@
     function addProductToInvoice(barcode) {
         let foundProduct = products.find(p => p.barcode === barcode);
         if (!foundProduct) {
-            alert('❌ هذا الباركود غير مسجل في السحابة: ' + barcode);
+            alert('❌ هذا الباركود غير مسجل محلياً: ' + barcode);
             return;
         }
 
@@ -581,28 +574,36 @@
         if (!name) return alert('الرجاء إدخال اسم المنتج على الأقل');
 
         let processSaving = (imgData) => {
-            let productItem = { 
-                name, category, barcode, singleBuy, singleSell, 
-                singleProfit: singleSell - singleBuy, 
-                bundleBuy, bundleSell, 
-                bundleProfit: bundleSell - bundleBuy, 
-                image: imgData || '' 
-            };
-
             if (!editDocId) {
-                db.collection("products").add(productItem).then(() => {
-                    alert('تم حفظ المنتج في السحابة بنجاح!');
-                    clearForm();
-                    switchTab('displayTab', document.querySelectorAll('.tab-btn')[2]);
-                });
+                let newItem = { 
+                    id: 'prod_' + Date.now(),
+                    name, category, barcode, singleBuy, singleSell, 
+                    singleProfit: singleSell - singleBuy, 
+                    bundleBuy, bundleSell, 
+                    bundleProfit: bundleSell - bundleBuy, 
+                    image: imgData || '' 
+                };
+                products.push(newItem);
+                alert('تم حفظ المنتج محلياً بنجاح!');
             } else {
-                if (!imgData) delete productItem.image; // الاحتفاظ بالصورة القديمة إن لم يتم تغييرها
-                db.collection("products").doc(editDocId).update(productItem).then(() => {
-                    alert('تم تعديل المنتج بنجاح!');
-                    clearForm();
-                    switchTab('displayTab', document.querySelectorAll('.tab-btn')[2]);
-                });
+                let p = products.find(item => item.id === editDocId);
+                if (p) {
+                    p.name = name;
+                    p.category = category;
+                    p.barcode = barcode;
+                    p.singleBuy = singleBuy;
+                    p.singleSell = singleSell;
+                    p.singleProfit = singleSell - singleBuy;
+                    p.bundleBuy = bundleBuy;
+                    p.bundleSell = bundleSell;
+                    p.bundleProfit = bundleSell - bundleBuy;
+                    if (imgData) p.image = imgData;
+                }
+                alert('تم تعديل المنتج بنجاح!');
             }
+            saveToLocalStorage();
+            clearForm();
+            switchTab('displayTab', document.querySelectorAll('.tab-btn')[2]);
         };
 
         if (imageInput.files && imageInput.files[0]) {
@@ -610,7 +611,12 @@
             reader.onload = function(e) { processSaving(e.target.result); };
             reader.readAsDataURL(imageInput.files[0]);
         } else {
-            processSaving('');
+            let existingImage = '';
+            if (editDocId) {
+                let p = products.find(item => item.id === editDocId);
+                if (p) existingImage = p.image;
+            }
+            processSaving(existingImage);
         }
     }
 
@@ -676,17 +682,16 @@
         document.getElementById('bundleBuy').value = p.bundleBuy;
         document.getElementById('bundleSell').value = p.bundleSell;
         document.getElementById('editDocId').value = p.id;
-        document.getElementById('saveBtn').innerText = 'تعديل المنتج في السحابة';
+        document.getElementById('saveBtn').innerText = 'تعديل المنتج محلياً';
         calculateSingleProfit();
         calculateBundleProfit();
         switchTab('addUnifiedTab', document.querySelectorAll('.tab-btn')[1]);
     }
 
     function deleteProduct(id) {
-        if(confirm('هل أنت متأكد من حذف هذا المنتج من السحابة (سيحذف من عند شريكك أيضاً)؟')) {
-            db.collection("products").doc(id).delete().then(() => {
-                renderProducts();
-            });
+        if(confirm('هل أنت متأكد من حذف هذا المنتج؟')) {
+            products = products.filter(item => item.id !== id);
+            saveToLocalStorage();
         }
     }
 
@@ -700,10 +705,12 @@
         document.getElementById('bundleSell').value = '';
         document.getElementById('productImage').value = '';
         document.getElementById('editDocId').value = '';
-        document.getElementById('saveBtn').innerText = 'حفظ المنتج في السحابة';
+        document.getElementById('saveBtn').innerText = 'حفظ المنتج محلياً';
         document.getElementById('singleResultDisplay').innerHTML = 'ربح القطعة: 0.00 ₺';
         document.getElementById('bundleResultDisplay').innerHTML = 'ربح الطرد الكامل: 0.00 ₺';
     }
+
+    renderProducts();
 </script>
 
 </body>
