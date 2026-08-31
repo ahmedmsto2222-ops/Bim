@@ -35,6 +35,8 @@
         window.html5QrCode = null;
         window.isScanningActive = false;
         window.targetInputField = null;
+        window.lastScannedCode = '';
+        window.isScanLocked = false;
 
         // جلب البيانات بالحياة الفورية (Real-time sync) من سحابة Firebase
         const productsRef = ref(db, 'supermarket_products');
@@ -506,6 +508,15 @@
         const config = { fps: 15, qrbox: { width: 250, height: 150 } };
 
         window.html5QrCode.start({ facingMode: "environment" }, config, (decodedText) => {
+            // منع القراءة المتكررة في وضع الكاشير باستخدام قفل مؤقت (Cooldown لثانيتين)
+            if (window.targetInputField === 'pos') {
+                if (window.isScanLocked) return;
+                window.isScanLocked = true;
+                setTimeout(() => {
+                    window.isScanLocked = false;
+                }, 2000); // مهلة زمنية لمدة ثانيتين
+            }
+
             playBeepSound();
             handleScannedBarcode(decodedText);
         }, (err) => {}).then(() => {
@@ -528,6 +539,7 @@
 
     function resetScannerUI() {
         window.isScanningActive = false;
+        window.isScanLocked = false;
         document.getElementById('interactive-scanner-container').style.display = 'none';
         document.getElementById('stopScannerBtn').style.display = 'none';
         document.getElementById('add-scanner-container').style.display = 'none';
@@ -713,9 +725,9 @@
                                 <div style="font-size: 16px; font-weight: bold; margin-bottom: 4px;">${p.name}</div>
                                 <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 8px;">${barcodeText}</div>
                                 
-                                <div style="background: #f8fafc; padding: 8px; border-radius: 6px; font-size: 13px; border: 1px solid var(--border);">
-                                    <div>🛒 <b>القطعة:</b> بيع (${p.singleSell || 0} ₺) | ربح (${p.singleProfit || 0} ₺)</div>
-                                    <div style="margin-top: 4px;">📦 <b>الطرد:</b> بيع (${p.bundleSell || 0} ₺) | ربح (${p.bundleProfit || 0} ₺)</div>
+                                <div style="background: #f8fafc; padding: 10px; border-radius: 6px; font-size: 13px; border: 1px solid var(--border);">
+                                    <div style="color: #1e293b; margin-bottom: 4px;">🛒 <b>القطعة:</b> سعر البيع: <span style="color:var(--primary); font-weight:bold;">${p.singleSell || 0} ₺</span> | الربح: <span style="color:var(--success); font-weight:bold;">${p.singleProfit || 0} ₺</span></div>
+                                    <div style="color: #1e293b;">📦 <b>الطرد:</b> سعر البيع: <span style="color:var(--primary); font-weight:bold;">${p.bundleSell || 0} ₺</span> | الربح: <span style="color:var(--success); font-weight:bold;">${p.bundleProfit || 0} ₺</span></div>
                                 </div>
                             </div>
                             <div style="display:flex; flex-direction:column; gap:6px; justify-content: center;">
