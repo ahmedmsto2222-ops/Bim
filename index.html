@@ -465,9 +465,22 @@
         </div>
 
         <div class="form-group">
-            <label>صورة المنتج (مع إزالة الخلفية تلقائياً)</label>
-            <input type="file" id="productImage" accept="image/*">
-            <small id="bgRemovalStatus" style="color: var(--primary); display: block; margin-top: 4px; font-weight: bold;"></small>
+            <label>صورة المنتج (التقاط بالكاميرا أو اختيار من المعرض مع إزالة الخلفية تلقائياً)</label>
+            <div style="display: flex; gap: 8px;">
+                <!-- زر التقاط صورة مباشرة بالكاميرا -->
+                <input type="file" id="cameraCaptureInput" accept="image/*" capture="environment" style="display: none;">
+                <button type="button" class="btn-camera" style="background-color: var(--success);" onclick="document.getElementById('cameraCaptureInput').click()">📸 التقاط صورة بالكاميرا</button>
+                
+                <!-- زر استرداد صورة من المعرض -->
+                <input type="file" id="galleryInput" accept="image/*" style="display: none;">
+                <button type="button" class="btn-camera" style="background-color: #0284c7;" onclick="document.getElementById('galleryInput').click()">🖼️ اختيار من المعرض</button>
+            </div>
+            <small id="bgRemovalStatus" style="color: var(--primary); display: block; margin-top: 6px; font-weight: bold;"></small>
+            
+            <!-- معاينة الصورة المصغرة -->
+            <div id="imagePreviewContainer" style="margin-top: 10px; display: none;">
+                <img id="previewImg" src="" style="width: 80px; height: 80px; object-fit: contain; border: 1px solid var(--border); border-radius: 8px; background: #fff; padding: 2px;">
+            </div>
         </div>
         
         <button id="saveBtn" class="btn-main" onclick="saveProduct()">حفظ المنتج بالسحابة</button>
@@ -569,10 +582,10 @@
         });
     }
 
-    // دالة معالجة صورة المنتج وإزالة خلفيتها فور اختيارها
+    // معالجة الصورة سواء قادمة من الكاميرا أو المعرض
     let processedProductImageUrl = '';
-    document.getElementById('productImage').addEventListener('change', async function(e) {
-        let file = e.target.files[0];
+
+    async function handleImageProcessing(file) {
         if (!file) return;
 
         let statusEl = document.getElementById('bgRemovalStatus');
@@ -584,14 +597,34 @@
             // دمج الصورة مع خلفية بيضاء
             processedProductImageUrl = await compositeWithWhiteBackground(transparentBlob);
             statusEl.innerText = '✅ تم إزالة الخلفية وجعلها بيضاء بنجاح!';
+            
+            // إظهار المعناية المصغرة
+            let previewContainer = document.getElementById('imagePreviewContainer');
+            let previewImg = document.getElementById('previewImg');
+            previewImg.src = processedProductImageUrl;
+            previewContainer.style.display = 'block';
         } catch (err) {
             statusEl.innerText = '⚠️ تعذر إزالة الخلفية تلقائياً، سيتم استخدام الصورة العادية.';
             let reader = new FileReader();
             reader.onload = function(evt) {
                 processedProductImageUrl = evt.target.result;
+                let previewContainer = document.getElementById('imagePreviewContainer');
+                let previewImg = document.getElementById('previewImg');
+                previewImg.src = processedProductImageUrl;
+                previewContainer.style.display = 'block';
             };
             reader.readAsDataURL(file);
         }
+    }
+
+    // ربط مدخل التقاط الكاميرا
+    document.getElementById('cameraCaptureInput').addEventListener('change', function(e) {
+        handleImageProcessing(e.target.files[0]);
+    });
+
+    // ربط مدخل المعرض
+    document.getElementById('galleryInput').addEventListener('change', function(e) {
+        handleImageProcessing(e.target.files[0]);
     });
 
     function readProductNameWithCamera() {
@@ -970,6 +1003,14 @@
         document.getElementById('bundleSell').value = p.bundleSell;
         document.getElementById('editDocId').value = p.id;
         processedProductImageUrl = p.image || '';
+        
+        if (p.image) {
+            let previewContainer = document.getElementById('imagePreviewContainer');
+            let previewImg = document.getElementById('previewImg');
+            previewImg.src = p.image;
+            previewContainer.style.display = 'block';
+        }
+
         document.getElementById('saveBtn').innerText = 'تعديل المنتج بالسحابة';
         calculateSingleProfit();
         calculateBundleProfit();
@@ -986,10 +1027,12 @@
         document.getElementById('bundleQty').value = '';
         document.getElementById('bundleBuy').value = '';
         document.getElementById('bundleSell').value = '';
-        document.getElementById('productImage').value = '';
+        document.getElementById('cameraCaptureInput').value = '';
+        document.getElementById('galleryInput').value = '';
         document.getElementById('editDocId').value = '';
         document.getElementById('ocrStatus').innerText = '';
         document.getElementById('bgRemovalStatus').innerText = '';
+        document.getElementById('imagePreviewContainer').style.display = 'none';
         processedProductImageUrl = '';
         document.getElementById('saveBtn').innerText = 'حفظ المنتج بالسحابة';
         document.getElementById('singleResultDisplay').innerHTML = 'ربح القطعة: 0.00 ₺';
