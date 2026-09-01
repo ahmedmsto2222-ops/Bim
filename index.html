@@ -6,7 +6,7 @@
     <title>تطبيق بيم الرضوان (سحابي)</title>
     <!-- استيراد مكتبة قراءة الباركود المباشرة -->
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
-    <!-- استيراد مكتبة التعرف على النصوص من الصور OCR لقراءة اسم المنتج بالكاميرا -->
+    <!-- استيراد مكتبة التعرف على النصوص من الصور OCR -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/4.0.2/tesseract.min.js"></script>
     
     <!-- استيراد مكتبات Firebase (الإصدار 10 المتوافق مع الويب) -->
@@ -14,9 +14,6 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getDatabase, ref, set, push, onValue, remove, update } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
-        // ==========================================
-        // إعدادات مشروعك السحابي المرتبط بـ Firebase
-        // ==========================================
         const firebaseConfig = {
             apiKey: "AIzaSyAaAgIgzvyN4BzF4bYlvpsK1QDAMQbNBGI",
             authDomain: "bim-c930c.firebaseapp.com",
@@ -27,11 +24,9 @@
             appId: "1:1041227214123:web:53c7a6e0d58e106237e96e"
         };
 
-        // تهيئة Firebase
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
 
-        // متغيرات عامة
         window.products = [];
         window.currentInvoice = [];
         window.html5QrCode = null;
@@ -39,7 +34,6 @@
         window.targetInputField = null;
         window.isScanLocked = false;
 
-        // جلب البيانات بالحياة الفورية (Real-time sync) من سحابة Firebase
         const productsRef = ref(db, 'supermarket_products');
         onValue(productsRef, (snapshot) => {
             const data = snapshot.val();
@@ -52,7 +46,6 @@
             if (typeof renderProducts === 'function') renderProducts();
         });
 
-        // دوال الحفظ والتعديل والحذف السحابية مع منع التكرار
         window.saveProductToCloud = function(productData, editId) {
             if (!editId) {
                 const exactMatch = window.products.find(p => 
@@ -139,7 +132,6 @@
             margin-bottom: 20px;
             font-size: 26px;
             font-weight: 800;
-            letter-spacing: 0.5px;
         }
 
         .tabs {
@@ -161,7 +153,6 @@
             font-weight: bold;
             border-radius: 8px;
             cursor: pointer;
-            transition: 0.3s;
             font-size: 13px;
             text-align: center;
         }
@@ -317,7 +308,6 @@
             border-radius: 12px;
             text-align: center;
             margin-bottom: 20px;
-            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.2);
         }
         .invoice-total-card h3 {
             margin: 0 0 5px 0;
@@ -337,6 +327,26 @@
             border: 1px solid var(--border);
             border-radius: 8px;
             margin-bottom: 8px;
+        }
+
+        /* تنسيق نافذة اختيار النصوص المنبثقة */
+        #ocrModal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+        }
+        .ocr-modal-content {
+            background: #fff;
+            width: 90%;
+            max-width: 500px;
+            padding: 20px;
+            border-radius: 12px;
+            max-height: 90vh;
+            overflow-y: auto;
         }
     </style>
 </head>
@@ -386,8 +396,8 @@
         <div class="form-group">
             <label>اسم المنتج</label>
             <div style="display: flex; gap: 8px;">
-                <input type="text" id="productName" placeholder="أدخل اسم المنتج أو استخدم الكاميرا لقراءته" onblur="checkExistingProductByName()">
-                <button type="button" class="btn-camera" style="width: 150px; background-color: #0284c7;" onclick="readProductNameWithCamera()">📷 قراءة الاسم بالكاميرا</button>
+                <input type="text" id="productName" placeholder="أدخل اسم المنتج أو استخدم الكاميرا" onblur="checkExistingProductByName()">
+                <button type="button" class="btn-camera" style="width: 170px; background-color: #0284c7;" onclick="readProductNameWithCamera()">📷 التقاط واختيار اسم</button>
             </div>
             <small id="ocrStatus" style="color: var(--primary); display: block; margin-top: 4px; font-weight: bold;"></small>
         </div>
@@ -479,6 +489,25 @@
 
 </div>
 
+<!-- نافذة اختيار النص المستخرج من الصورة -->
+<div id="ocrModal">
+    <div class="ocr-modal-content">
+        <h3 style="margin-top:0; color:var(--primary);">✂️ حدد واختر اسم المنتج</h3>
+        <p style="font-size:13px; color:var(--text-muted);">تم استخراج الكلمات التالية من الصورة، اضغط على الكلمة المطلوبة أو انسخها وضعها كاسم للمنتج:</p>
+        <div id="ocrWordsContainer" style="display: flex; flex-wrap: wrap; gap: 6px; margin: 15px 0; max-height: 200px; overflow-y: auto; padding: 10px; background:#f1f5f9; border-radius:8px;"></div>
+        
+        <div class="form-group">
+            <label>أو قم بتعديل النص بالكامل هنا:</label>
+            <input type="text" id="ocrEditableResult" placeholder="النص النهائي للاسم">
+        </div>
+        
+        <div style="display: flex; gap: 10px; margin-top: 15px;">
+            <button class="btn-main" style="background-color: var(--success);" onclick="confirmOcrSelection()">اعتماد هذا الاسم ✅</button>
+            <button class="btn-main" style="background-color: var(--danger);" onclick="closeOcrModal()">إلغاء ❌</button>
+        </div>
+    </div>
+</div>
+
 <script>
     function playBeepSound() {
         try {
@@ -507,33 +536,76 @@
         if(tabId === 'posTab') renderInvoice();
     }
 
-    // دالة لقراءة اسم المنتج من صورة الكاميرا باستخدام تقنية التعرف الضوئي OCR
+    // التقاط صورة وقراءة النصوص لتحديد الاسم بدقة
     function readProductNameWithCamera() {
         let inputUpload = document.createElement('input');
         inputUpload.type = 'file';
         inputUpload.accept = 'image/*';
-        inputUpload.capture = 'environment'; // فتح الكاميرا الخلفية مباشرة في الجوالات
+        inputUpload.capture = 'environment';
 
         inputUpload.onchange = async (e) => {
             let file = e.target.files[0];
             if (!file) return;
 
             let statusEl = document.getElementById('ocrStatus');
-            statusEl.innerText = '⏳ جاري قراءة اسم المنتج من الصورة، لطفا الانتظار...';
+            statusEl.innerText = '⏳ جاري تحليل الصورة واستخراج الكلمات...';
 
             try {
                 let result = await Tesseract.recognize(file, 'ara+eng', {
                     logger: m => {}
                 });
-                let extractedText = result.data.text.trim().split('\n')[0] || '';
-                document.getElementById('productName').value = extractedText;
-                statusEl.innerText = '✅ تم استخراج اسم المنتج بنجاح!';
-                checkExistingProductByName();
+                let fullText = result.data.text.trim();
+                
+                statusEl.innerText = '';
+                openOcrModal(fullText);
             } catch (err) {
                 statusEl.innerText = '❌ تعذر قراءة النص، حاول التقاط صورة أوضح.';
             }
         };
         inputUpload.click();
+    }
+
+    function openOcrModal(text) {
+        let modal = document.getElementById('ocrModal');
+        let wordsContainer = document.getElementById('ocrWordsContainer');
+        let editableInput = document.getElementById('ocrEditableResult');
+        
+        editableInput.value = text.replace(/\n/g, ' ');
+        wordsContainer.innerHTML = '';
+
+        // تقسيم النص إلى كلمات أو أسطر مستقلة ليسهل على المستخدم النقر عليها واختيارها
+        let cleanWords = text.split(/[\s\n]+/).filter(w => w.trim().length > 0);
+        
+        if (cleanWords.length === 0) {
+            wordsContainer.innerHTML = '<span style="color:var(--danger)">لم يتم العثور على كلمات واضحة.</span>';
+        } else {
+            cleanWords.forEach(word => {
+                let span = document.createElement('span');
+                span.innerText = word;
+                span.style.cssText = "background:#fff; border:1px solid var(--border); padding:6px 10px; border-radius:6px; cursor:pointer; font-weight:bold; font-size:14px; transition:0.2s;";
+                span.onclick = function() {
+                    // إضافة الكلمة المختار إلى حقل التعديل
+                    let currentVal = editableInput.value.trim();
+                    editableInput.value = currentVal ? currentVal + ' ' + word : word;
+                };
+                wordsContainer.appendChild(span);
+            });
+        }
+
+        modal.style.display = 'flex';
+    }
+
+    function closeOcrModal() {
+        document.getElementById('ocrModal').style.display = 'none';
+    }
+
+    function confirmOcrSelection() {
+        let finalVal = document.getElementById('ocrEditableResult').value.trim();
+        if (finalVal) {
+            document.getElementById('productName').value = finalVal;
+            checkExistingProductByName();
+        }
+        closeOcrModal();
     }
 
     function checkExistingProductByName() {
@@ -602,9 +674,7 @@
             if (window.targetInputField === 'pos') {
                 if (window.isScanLocked) return;
                 window.isScanLocked = true;
-                setTimeout(() => {
-                    window.isScanLocked = false;
-                }, 2000);
+                setTimeout(() => { window.isScanLocked = false; }, 2000);
             }
 
             playBeepSound();
@@ -860,18 +930,18 @@
     }
 
     function clearForm() {
-        document.getElementById('productName').value = '';
-        document.getElementById('productCategory').value = '';
-        document.getElementById('productWeight').value = '';
-        document.getElementById('productBarcode').value = '';
-        document.getElementById('singleBuy').value = '';
-        document.getElementById('singleSell').value = '';
-        document.getElementById('bundleQty').value = '';
-        document.getElementById('bundleBuy').value = '';
-        document.getElementById('bundleSell').value = '';
-        document.getElementById('productImage').value = '';
-        document.getElementById('editDocId').value = '';
-        document.getElementById('ocrStatus').innerText = '';
+        document.getElementById('productName').value = ``;
+        document.getElementById('productCategory').value = ``;
+        document.getElementById('productWeight').value = ``;
+        document.getElementById('productBarcode').value = ``;
+        document.getElementById('singleBuy').value = ``;
+        document.getElementById('singleSell').value = ``;
+        document.getElementById('bundleQty').value = ``;
+        document.getElementById('bundleBuy').value = ``;
+        document.getElementById('bundleSell').value = ``;
+        document.getElementById('productImage').value = ``;
+        document.getElementById('editDocId').value = ``;
+        document.getElementById('ocrStatus').innerText = ``;
         document.getElementById('saveBtn').innerText = 'حفظ المنتج بالسحابة';
         document.getElementById('singleResultDisplay').innerHTML = 'ربح القطعة: 0.00 ₺';
         document.getElementById('bundleResultDisplay').innerHTML = 'ربح الطرد الكامل: 0.00 ₺';
