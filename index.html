@@ -8,6 +8,8 @@
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
     <!-- استيراد مكتبة التعرف على النصوص من الصور OCR -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/4.0.2/tesseract.min.js"></script>
+    <!-- استيراد مكتبة إزالة الخلفية بالذكاء الاصطناعي -->
+    <script src="https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.4.5/dist/index.umd.js"></script>
     
     <!-- استيراد مكتبات Firebase (الإصدار 10 المتوافق مع الويب) -->
     <script type="module">
@@ -279,23 +281,26 @@
         }
 
         .item-img {
-            width: 50px;
-            height: 50px;
-            object-fit: cover;
+            width: 55px;
+            height: 55px;
+            object-fit: contain;
+            background: #ffffff;
             border-radius: 8px;
             border: 1px solid var(--border);
+            padding: 2px;
         }
 
         .no-img {
-            width: 50px;
-            height: 50px;
-            background: #f1f5f9;
+            width: 55px;
+            height: 55px;
+            background: #ffffff;
             border-radius: 8px;
             display: flex;
             align-items: center;
             justify-content: center;
             font-size: 10px;
             color: var(--text-muted);
+            border: 1px solid var(--border);
         }
 
         button.btn-edit { background-color: var(--warning); color: white; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; }
@@ -329,7 +334,6 @@
             margin-bottom: 8px;
         }
 
-        /* تنسيق نافذة اختيار النصوص المنبثقة */
         #ocrModal {
             display: none;
             position: fixed;
@@ -461,8 +465,9 @@
         </div>
 
         <div class="form-group">
-            <label>صورة المنتج</label>
+            <label>صورة المنتج (مع إزالة الخلفية تلقائياً)</label>
             <input type="file" id="productImage" accept="image/*">
+            <small id="bgRemovalStatus" style="color: var(--primary); display: block; margin-top: 4px; font-weight: bold;"></small>
         </div>
         
         <button id="saveBtn" class="btn-main" onclick="saveProduct()">حفظ المنتج بالسحابة</button>
@@ -536,7 +541,59 @@
         if(tabId === 'posTab') renderInvoice();
     }
 
-    // التقاط صورة وقراءة النصوص لتحديد الاسم بدقة
+    // دالة مساعدة لدمج الصورة الشفافة الناتجة مع خلفية بيضاء نقية
+    async function compositeWithWhiteBackground(imageBlob) {
+        return new Promise((resolve) => {
+            let reader = new FileReader();
+            reader.onload = function(event) {
+                let img = new Image();
+                img.onload = function() {
+                    let canvas = document.createElement('canvas');
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    let ctx = canvas.getContext('2d');
+                    
+                    // رسم خلفية بيضاء بالكامل
+                    ctx.fillStyle = "#FFFFFF";
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    
+                    // رسم صورة المنتج فوق الخلفية البيضاء
+                    ctx.drawImage(img, 0, 0);
+                    
+                    // تحويل النتيجة إلى صيغة Base64
+                    resolve(canvas.toDataURL('image/jpeg', 0.9));
+                };
+                img.src = event.target.result;
+            };
+            reader.readAsDataURL(imageBlob);
+        });
+    }
+
+    // دالة معالجة صورة المنتج وإزالة خلفيتها فور اختيارها
+    let processedProductImageUrl = '';
+    document.getElementById('productImage').addEventListener('change', async function(e) {
+        let file = e.target.files[0];
+        if (!file) return;
+
+        let statusEl = document.getElementById('bgRemovalStatus');
+        statusEl.innerText = '⏳ جاري إزالة الخلفية وجعلها بيضاء بالذكاء الاصطناعي...';
+
+        try {
+            // استخدام مكتبة imgly لإزالة الخلفية
+            let transparentBlob = await imglyRemoveBackground(file);
+            // دمج الصورة مع خلفية بيضاء
+            processedProductImageUrl = await compositeWithWhiteBackground(transparentBlob);
+            statusEl.innerText = '✅ تم إزالة الخلفية وجعلها بيضاء بنجاح!';
+        } catch (err) {
+            statusEl.innerText = '⚠️ تعذر إزالة الخلفية تلقائياً، سيتم استخدام الصورة العادية.';
+            let reader = new FileReader();
+            reader.onload = function(evt) {
+                processedProductImageUrl = evt.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+
     function readProductNameWithCamera() {
         let inputUpload = document.createElement('input');
         inputUpload.type = 'file';
@@ -555,7 +612,6 @@
                     logger: m => {}
                 });
                 let fullText = result.data.text.trim();
-                
                 statusEl.innerText = '';
                 openOcrModal(fullText);
             } catch (err) {
@@ -573,7 +629,6 @@
         editableInput.value = text.replace(/\n/g, ' ');
         wordsContainer.innerHTML = '';
 
-        // تقسيم النص إلى كلمات أو أسطر مستقلة ليسهل على المستخدم النقر عليها واختيارها
         let cleanWords = text.split(/[\s\n]+/).filter(w => w.trim().length > 0);
         
         if (cleanWords.length === 0) {
@@ -584,7 +639,6 @@
                 span.innerText = word;
                 span.style.cssText = "background:#fff; border:1px solid var(--border); padding:6px 10px; border-radius:6px; cursor:pointer; font-weight:bold; font-size:14px; transition:0.2s;";
                 span.onclick = function() {
-                    // إضافة الكلمة المختار إلى حقل التعديل
                     let currentVal = editableInput.value.trim();
                     editableInput.value = currentVal ? currentVal + ' ' + word : word;
                 };
@@ -820,34 +874,26 @@
         let bundleBuy = parseFloat(document.getElementById('bundleBuy').value) || 0;
         let bundleSell = parseFloat(document.getElementById('bundleSell').value) || 0;
         let editDocId = document.getElementById('editDocId').value;
-        let imageInput = document.getElementById('productImage');
 
         if (!name) return alert('الرجاء إدخال اسم المنتج على الأقل');
 
-        let processSaving = (imgData) => {
-            let productData = {
-                name, category, weight, barcode, 
-                singleBuy, singleSell,
-                singleProfit: singleSell - singleBuy,
-                bundleQty, bundleBuy, bundleSell,
-                bundleProfit: bundleSell - bundleBuy,
-                image: imgData || ''
-            };
-            window.saveProductToCloud(productData, editDocId);
-        };
-
-        if (imageInput.files && imageInput.files[0]) {
-            let reader = new FileReader();
-            reader.onload = function(e) { processSaving(e.target.result); };
-            reader.readAsDataURL(imageInput.files[0]);
-        } else {
-            let existingImage = '';
-            if (editDocId) {
-                let p = window.products.find(item => item.id === editDocId);
-                if (p) existingImage = p.image;
-            }
-            processSaving(existingImage);
+        let existingImage = '';
+        if (editDocId) {
+            let p = window.products.find(item => item.id === editDocId);
+            if (p) existingImage = p.image;
         }
+
+        let finalImgData = processedProductImageUrl || existingImage;
+
+        let productData = {
+            name, category, weight, barcode, 
+            singleBuy, singleSell,
+            singleProfit: singleSell - singleBuy,
+            bundleQty, bundleBuy, bundleSell,
+            bundleProfit: bundleSell - bundleBuy,
+            image: finalImgData
+        };
+        window.saveProductToCloud(productData, editDocId);
     }
 
     window.renderProducts = function() {
@@ -923,6 +969,7 @@
         document.getElementById('bundleBuy').value = p.bundleBuy;
         document.getElementById('bundleSell').value = p.bundleSell;
         document.getElementById('editDocId').value = p.id;
+        processedProductImageUrl = p.image || '';
         document.getElementById('saveBtn').innerText = 'تعديل المنتج بالسحابة';
         calculateSingleProfit();
         calculateBundleProfit();
@@ -930,18 +977,20 @@
     }
 
     function clearForm() {
-        document.getElementById('productName').value = ``;
-        document.getElementById('productCategory').value = ``;
-        document.getElementById('productWeight').value = ``;
-        document.getElementById('productBarcode').value = ``;
-        document.getElementById('singleBuy').value = ``;
-        document.getElementById('singleSell').value = ``;
-        document.getElementById('bundleQty').value = ``;
-        document.getElementById('bundleBuy').value = ``;
-        document.getElementById('bundleSell').value = ``;
-        document.getElementById('productImage').value = ``;
-        document.getElementById('editDocId').value = ``;
-        document.getElementById('ocrStatus').innerText = ``;
+        document.getElementById('productName').value = '';
+        document.getElementById('productCategory').value = '';
+        document.getElementById('productWeight').value = '';
+        document.getElementById('productBarcode').value = '';
+        document.getElementById('singleBuy').value = '';
+        document.getElementById('singleSell').value = '';
+        document.getElementById('bundleQty').value = '';
+        document.getElementById('bundleBuy').value = '';
+        document.getElementById('bundleSell').value = '';
+        document.getElementById('productImage').value = '';
+        document.getElementById('editDocId').value = '';
+        document.getElementById('ocrStatus').innerText = '';
+        document.getElementById('bgRemovalStatus').innerText = '';
+        processedProductImageUrl = '';
         document.getElementById('saveBtn').innerText = 'حفظ المنتج بالسحابة';
         document.getElementById('singleResultDisplay').innerHTML = 'ربح القطعة: 0.00 ₺';
         document.getElementById('bundleResultDisplay').innerHTML = 'ربح الطرد الكامل: 0.00 ₺';
