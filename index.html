@@ -133,7 +133,7 @@
         }
 
         .container {
-            max-width: 650px;
+            max-width: 750px;
             margin: auto;
             background: var(--card-bg);
             padding: 20px;
@@ -349,7 +349,6 @@
             margin-bottom: 8px;
         }
 
-        /* تنسيق جدول الإدخال السريع */
         .batch-table {
             width: 100%;
             border-collapse: collapse;
@@ -357,17 +356,17 @@
         }
         .batch-table th, .batch-table td {
             border: 1px solid var(--border);
-            padding: 8px;
+            padding: 6px;
             text-align: center;
-            font-size: 13px;
+            font-size: 12px;
         }
         .batch-table th {
             background: #f1f5f9;
             color: var(--primary);
         }
         .batch-table input {
-            padding: 8px;
-            font-size: 13px;
+            padding: 6px;
+            font-size: 12px;
         }
 
         #ocrModal {
@@ -430,21 +429,25 @@
         <button class="btn-main" style="background-color: var(--primary);" onclick="checkoutInvoice()">إتمام البيع وتصفير الفاتورة ✅</button>
     </div>
 
-    <!-- 2. قسم الجدول السريع للإدخال المتتالي -->
+    <!-- 2. قسم الجدول السريع الشامل -->
     <div id="quickBatchTab" class="tab-content">
         <div class="section-box">
-            <div class="section-title">⚡ الإدخال السريع والمتتالي (صفوف متعددة)</div>
-            <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">قم بكتابة أسعار وأسماء المنتجات مباشرة في الجدول تلو الآخر دون الحاجة لفتح صفحات منفصلة، ثم اضغط حفظ الكل.</p>
+            <div class="section-title">⚡ الجدول السريع الشامل (اسم، وزن، باركود، قطع وطرود)</div>
+            <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">أدخل سعر الطرد وعدد القطع، وسيقوم الجدول بحساب سعر شراء القطعة تلقائياً.</p>
             
             <div style="overflow-x: auto;">
                 <table class="batch-table">
                     <thead>
                         <tr>
-                            <th style="width: 30%;">اسم المنتج *</th>
-                            <th style="width: 20%;">الباركود</th>
-                            <th style="width: 15%;">شراء (₺)</th>
-                            <th style="width: 15%;">بيع (₺)</th>
-                            <th style="width: 20%;">إجراء</th>
+                            <th style="min-width: 100px;">الاسم *</th>
+                            <th style="min-width: 65px;">الوزن</th>
+                            <th style="min-width: 75px;">الباركود</th>
+                            <th style="min-width: 55px;">شراء قط</th>
+                            <th style="min-width: 55px;">بيع قط</th>
+                            <th style="min-width: 45px;">عدد طرد</th>
+                            <th style="min-width: 55px;">شراء طرد</th>
+                            <th style="min-width: 55px;">بيع طرد</th>
+                            <th style="min-width: 45px;">حذف</th>
                         </tr>
                     </thead>
                     <tbody id="quickBatchRowsContainer">
@@ -496,10 +499,29 @@
         <button type="button" id="stopAddScannerBtn" style="display:none; background-color:var(--danger); color:white; border:none; padding:8px; width:100%; border-radius:8px; margin-bottom:15px; cursor:pointer;" onclick="stopLiveScanner()">إيقاف الكاميرا ❌</button>
 
         <div class="section-box">
+            <div class="section-title">📦 البيع والشراء بالطرد الكامل (يحسب القطعة تلقائياً)</div>
+            <div class="form-group" style="margin-bottom: 12px;">
+                <label>عدد القطع في الطرد الواحد</label>
+                <input type="number" id="bundleQty" placeholder="مثال: 12 أو 24 قطعة" oninput="calculateUnitFromBundle()">
+            </div>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>سعر شراء الطرد (₺)</label>
+                    <input type="number" id="bundleBuy" placeholder="0.00" oninput="calculateUnitFromBundle()">
+                </div>
+                <div class="form-group">
+                    <label>سعر بيع الطرد (₺)</label>
+                    <input type="number" id="bundleSell" placeholder="0.00" oninput="calculateBundleProfit()">
+                </div>
+            </div>
+            <div class="result-box" id="bundleResultDisplay" style="background: #d1fae5; color: #065f46;">ربح الطرد الكامل: 0.00 ₺</div>
+        </div>
+
+        <div class="section-box">
             <div class="section-title">📦 البيع والشراء بالمفرد (للقطعة)</div>
             <div class="form-grid">
                 <div class="form-group">
-                    <label>سعر شراء القطعة (₺)</label>
+                    <label>سعر شراء القطعة (₺) <small style="color:var(--primary);">(يحسب تلقائياً)</small></label>
                     <input type="number" id="singleBuy" placeholder="0.00" oninput="calculateSingleProfit()">
                 </div>
                 <div class="form-group">
@@ -510,27 +532,8 @@
             <div class="result-box" id="singleResultDisplay">ربح القطعة: 0.00 ₺</div>
         </div>
 
-        <div class="section-box">
-            <div class="section-title">📦 البيع والشراء بالطرد الكامل</div>
-            <div class="form-group" style="margin-bottom: 12px;">
-                <label>عدد القطع في الطرد الواحد</label>
-                <input type="number" id="bundleQty" placeholder="مثال: 12 أو 24 قطعة">
-            </div>
-            <div class="form-grid">
-                <div class="form-group">
-                    <label>سعر شراء الطرد (₺)</label>
-                    <input type="number" id="bundleBuy" placeholder="0.00" oninput="calculateBundleProfit()">
-                </div>
-                <div class="form-group">
-                    <label>سعر بيع الطرد (₺)</label>
-                    <input type="number" id="bundleSell" placeholder="0.00" oninput="calculateBundleProfit()">
-                </div>
-            </div>
-            <div class="result-box" id="bundleResultDisplay" style="background: #d1fae5; color: #065f46;">ربح الطرد الكامل: 0.00 ₺</div>
-        </div>
-
         <div class="form-group">
-            <label>صورة المنتج (مع معالجة وإضافة خلفية بيضاء تلقائياً)</label>
+            <label>صورة المنتج (مع إزالة الخلفية ووضع خلفية بيضاء تلقائياً)</label>
             <div style="display: flex; gap: 8px;">
                 <input type="file" id="cameraCaptureInput" accept="image/*" capture="environment" style="display: none;">
                 <button type="button" class="btn-camera" style="background-color: var(--success);" onclick="document.getElementById('cameraCaptureInput').click()">📸 التقاط بالكاميرا</button>
@@ -619,20 +622,20 @@
         }
     }
 
-    // إدارة الجدول السريع
+    // إدارة الجدول السريع الشامل مع حساب سعر القطعة التلقائي
     window.quickBatchRows = [];
 
     function initQuickBatchRows() {
         window.quickBatchRows = [
-            { name: '', barcode: '', singleBuy: '', singleSell: '' },
-            { name: '', barcode: '', singleBuy: '', singleSell: '' },
-            { name: '', barcode: '', singleBuy: '', singleSell: '' }
+            { name: '', weight: '', barcode: '', singleBuy: '', singleSell: '', bundleQty: '', bundleBuy: '', bundleSell: '' },
+            { name: '', weight: '', barcode: '', singleBuy: '', singleSell: '', bundleQty: '', bundleBuy: '', bundleSell: '' },
+            { name: '', weight: '', barcode: '', singleBuy: '', singleSell: '', bundleQty: '', bundleBuy: '', bundleSell: '' }
         ];
         renderQuickBatchTable();
     }
 
     function addBatchRow() {
-        window.quickBatchRows.push({ name: '', barcode: '', singleBuy: '', singleSell: '' });
+        window.quickBatchRows.push({ name: '', weight: '', barcode: '', singleBuy: '', singleSell: '', bundleQty: '', bundleBuy: '', bundleSell: '' });
         renderQuickBatchTable();
     }
 
@@ -651,11 +654,15 @@
         window.quickBatchRows.forEach((row, index) => {
             tbody.innerHTML += `
                 <tr>
-                    <td><input type="text" placeholder="اسم المنتج" value="${row.name}" oninput="updateBatchField(${index}, 'name', this.value)"></td>
-                    <td><input type="text" placeholder="الباركود" value="${row.barcode}" oninput="updateBatchField(${index}, 'barcode', this.value)"></td>
-                    <td><input type="number" placeholder="0" value="${row.singleBuy}" oninput="updateBatchField(${index}, 'singleBuy', this.value)"></td>
+                    <td><input type="text" placeholder="الاسم" value="${row.name}" oninput="updateBatchField(${index}, 'name', this.value)"></td>
+                    <td><input type="text" placeholder="الوزن" value="${row.weight}" oninput="updateBatchField(${index}, 'weight', this.value)"></td>
+                    <td><input type="text" placeholder="باركود" value="${row.barcode}" oninput="updateBatchField(${index}, 'barcode', this.value)"></td>
+                    <td><input type="number" id="batch_sBuy_${index}" placeholder="0" value="${row.singleBuy}" oninput="updateBatchField(${index}, 'singleBuy', this.value)"></td>
                     <td><input type="number" placeholder="0" value="${row.singleSell}" oninput="updateBatchField(${index}, 'singleSell', this.value)"></td>
-                    <td><button type="button" class="btn-delete" style="padding: 6px 10px; font-size:12px;" onclick="removeBatchRow(${index})">حذف</button></td>
+                    <td><input type="number" id="batch_bQty_${index}" placeholder="0" value="${row.bundleQty}" oninput="calculateBatchRowItem(${index})"></td>
+                    <td><input type="number" id="batch_bBuy_${index}" placeholder="0" value="${row.bundleBuy}" oninput="calculateBatchRowItem(${index})"></td>
+                    <td><input type="number" placeholder="0" value="${row.bundleSell}" oninput="updateBatchField(${index}, 'bundleSell', this.value)"></td>
+                    <td><button type="button" class="btn-delete" style="padding: 4px 8px; font-size:11px;" onclick="removeBatchRow(${index})">حذف</button></td>
                 </tr>
             `;
         });
@@ -663,6 +670,21 @@
 
     function updateBatchField(index, field, value) {
         window.quickBatchRows[index][field] = value;
+    }
+
+    function calculateBatchRowItem(index) {
+        let bQty = parseFloat(document.getElementById(`batch_bQty_${index}`).value) || 0;
+        let bBuy = parseFloat(document.getElementById(`batch_bBuy_${index}`).value) || 0;
+        
+        window.quickBatchRows[index].bundleQty = bQty;
+        window.quickBatchRows[index].bundleBuy = bBuy;
+
+        if (bQty > 0 && bBuy > 0) {
+            let calculatedSingleBuy = (bBuy / bQty).toFixed(2);
+            window.quickBatchRows[index].singleBuy = calculatedSingleBuy;
+            let sBuyInput = document.getElementById(`batch_sBuy_${index}`);
+            if(sBuyInput) sBuyInput.value = calculatedSingleBuy;
+        }
     }
 
     function saveAllBatchRows() {
@@ -675,18 +697,21 @@
         let formattedList = validRows.map(r => {
             let sBuy = parseFloat(r.singleBuy) || 0;
             let sSell = parseFloat(r.singleSell) || 0;
+            let bQty = parseInt(r.bundleQty) || 0;
+            let bBuy = parseFloat(r.bundleBuy) || 0;
+            let bSell = parseFloat(r.bundleSell) || 0;
             return {
                 name: r.name.trim(),
                 category: 'عام',
-                weight: 'غير محدد',
+                weight: r.weight.trim() || 'غير محدد',
                 barcode: r.barcode.trim(),
                 singleBuy: sBuy,
                 singleSell: sSell,
                 singleProfit: sSell - sBuy,
-                bundleQty: 0,
-                bundleBuy: 0,
-                bundleSell: 0,
-                bundleProfit: 0,
+                bundleQty: bQty,
+                bundleBuy: bBuy,
+                bundleSell: bSell,
+                bundleProfit: bSell - bBuy,
                 image: ''
             };
         });
@@ -1001,6 +1026,19 @@
         alert(`✅ تم إتمام الفاتورة بنجاح!\nالمبلغ الإجمالي المطلوب: ${total.toFixed(2)} ₺`);
         window.currentInvoice = [];
         renderInvoice();
+    }
+
+    // دالة لحساب سعر القطعة من الطرد في شاشة الإضافة المفردة تلقائياً
+    function calculateUnitFromBundle() {
+        let bundleQty = parseInt(document.getElementById('bundleQty').value) || 0;
+        let bundleBuy = parseFloat(document.getElementById('bundleBuy').value) || 0;
+
+        if (bundleQty > 0 && bundleBuy > 0) {
+            let unitBuyPrice = (bundleBuy / bundleQty).toFixed(2);
+            document.getElementById('singleBuy').value = unitBuyPrice;
+            calculateSingleProfit();
+        }
+        calculateBundleProfit();
     }
 
     function calculateSingleProfit() {
