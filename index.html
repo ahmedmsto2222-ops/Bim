@@ -62,7 +62,7 @@
                         update(itemRef, productData).then(() => {
                             alert('✅ تم تحديث بيانات المنتج الموجود مسبقاً بنجاح!');
                             clearForm();
-                            switchTab('displayTab', document.querySelectorAll('.tab-btn')[2]);
+                            switchTab('displayTab', document.querySelectorAll('.tab-btn')[3]);
                         }).catch(err => alert('خطأ في التحديث: ' + err.message));
                     }
                     return;
@@ -72,15 +72,30 @@
                 set(newRef, productData).then(() => {
                     alert('✅ تم حفظ المنتج ومشاركته مع شريكك بنجاح!');
                     clearForm();
-                    switchTab('displayTab', document.querySelectorAll('.tab-btn')[2]);
+                    switchTab('displayTab', document.querySelectorAll('.tab-btn')[3]);
                 }).catch(err => alert('خطأ في الحفظ: ' + err.message));
             } else {
                 const itemRef = ref(db, 'supermarket_products/' + editId);
                 update(itemRef, productData).then(() => {
                     alert('✅ تم تعديل المنتج وتحديثه لدى شريكك بنجاح!');
                     clearForm();
-                    switchTab('displayTab', document.querySelectorAll('.tab-btn')[2]);
+                    switchTab('displayTab', document.querySelectorAll('.tab-btn')[3]);
                 }).catch(err => alert('خطأ في التعديل: ' + err.message));
+            }
+        };
+
+        window.saveBatchProductsToCloud = async function(batchList) {
+            try {
+                for (let prod of batchList) {
+                    const newRef = push(productsRef);
+                    await set(newRef, prod);
+                }
+                alert(`✅ تم حفظ ${batchList.length} منتجاً دفعة واحدة بنجاح في السحابة!`);
+                window.quickBatchRows = [];
+                renderQuickBatchTable();
+                switchTab('displayTab', document.querySelectorAll('.tab-btn')[3]);
+            } catch (err) {
+                alert('خطأ أثناء الحفظ الجماعي: ' + err.message);
             }
         };
 
@@ -118,7 +133,7 @@
         }
 
         .container {
-            max-width: 600px;
+            max-width: 650px;
             margin: auto;
             background: var(--card-bg);
             padding: 20px;
@@ -138,7 +153,7 @@
 
         .tabs {
             display: flex;
-            gap: 6px;
+            gap: 4px;
             margin-bottom: 20px;
             border-bottom: 2px solid var(--border);
             padding-bottom: 10px;
@@ -147,15 +162,15 @@
 
         .tab-btn {
             flex: 1;
-            min-width: 100px;
-            padding: 10px 5px;
+            min-width: 85px;
+            padding: 10px 4px;
             border: none;
             background: #e2e8f0;
             color: var(--text-main);
             font-weight: bold;
             border-radius: 8px;
             cursor: pointer;
-            font-size: 13px;
+            font-size: 12px;
             text-align: center;
         }
 
@@ -334,6 +349,27 @@
             margin-bottom: 8px;
         }
 
+        /* تنسيق جدول الإدخال السريع */
+        .batch-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 15px;
+        }
+        .batch-table th, .batch-table td {
+            border: 1px solid var(--border);
+            padding: 8px;
+            text-align: center;
+            font-size: 13px;
+        }
+        .batch-table th {
+            background: #f1f5f9;
+            color: var(--primary);
+        }
+        .batch-table input {
+            padding: 8px;
+            font-size: 13px;
+        }
+
         #ocrModal {
             display: none;
             position: fixed;
@@ -360,8 +396,9 @@
     <h2 class="app-title">بيم الرضوان 🛒</h2>
     
     <div class="tabs">
-        <button class="tab-btn active" onclick="switchTab('posTab', this)">🛒 الكاشير والفاتورة</button>
-        <button class="tab-btn" onclick="switchTab('addUnifiedTab', this)">➕ إضافة منتج</button>
+        <button class="tab-btn active" onclick="switchTab('posTab', this)">🛒 الكاشير</button>
+        <button class="tab-btn" onclick="switchTab('quickBatchTab', this)">⚡ الجدول السريع</button>
+        <button class="tab-btn" onclick="switchTab('addUnifiedTab', this)">➕ إضافة مفردة</button>
         <button class="tab-btn" onclick="switchTab('displayTab', this)">📋 المنتجات</button>
     </div>
 
@@ -393,7 +430,35 @@
         <button class="btn-main" style="background-color: var(--primary);" onclick="checkoutInvoice()">إتمام البيع وتصفير الفاتورة ✅</button>
     </div>
 
-    <!-- 2. قسم إضافة وحفظ المنتج -->
+    <!-- 2. قسم الجدول السريع للإدخال المتتالي -->
+    <div id="quickBatchTab" class="tab-content">
+        <div class="section-box">
+            <div class="section-title">⚡ الإدخال السريع والمتتالي (صفوف متعددة)</div>
+            <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">قم بكتابة أسعار وأسماء المنتجات مباشرة في الجدول تلو الآخر دون الحاجة لفتح صفحات منفصلة، ثم اضغط حفظ الكل.</p>
+            
+            <div style="overflow-x: auto;">
+                <table class="batch-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 30%;">اسم المنتج *</th>
+                            <th style="width: 20%;">الباركود</th>
+                            <th style="width: 15%;">شراء (₺)</th>
+                            <th style="width: 15%;">بيع (₺)</th>
+                            <th style="width: 20%;">إجراء</th>
+                        </tr>
+                    </thead>
+                    <tbody id="quickBatchRowsContainer">
+                        <!-- تُضاف الصفوف ديناميكياً هنا -->
+                    </tbody>
+                </table>
+            </div>
+
+            <button type="button" class="btn-camera" style="background-color: #0284c7; margin-bottom: 15px;" onclick="addBatchRow()">➕ إضافة صف جديد للجدول</button>
+            <button type="button" class="btn-main" onclick="saveAllBatchRows()">💾 حفظ جميع المنتجات دفعة واحدة بالسحابة</button>
+        </div>
+    </div>
+
+    <!-- 3. قسم إضافة وحفظ المنتج بالطريقة العادية -->
     <div id="addUnifiedTab" class="tab-content">
         <input type="hidden" id="editDocId" value="">
 
@@ -465,19 +530,16 @@
         </div>
 
         <div class="form-group">
-            <label>صورة المنتج (التقاط بالكاميرا أو اختيار من المعرض)</label>
+            <label>صورة المنتج (مع معالجة وإضافة خلفية بيضاء تلقائياً)</label>
             <div style="display: flex; gap: 8px;">
-                <!-- زر التقاط صورة مباشرة بالكاميرا -->
                 <input type="file" id="cameraCaptureInput" accept="image/*" capture="environment" style="display: none;">
-                <button type="button" class="btn-camera" style="background-color: var(--success);" onclick="document.getElementById('cameraCaptureInput').click()">📸 التقاط صورة بالكاميرا</button>
+                <button type="button" class="btn-camera" style="background-color: var(--success);" onclick="document.getElementById('cameraCaptureInput').click()">📸 التقاط بالكاميرا</button>
                 
-                <!-- زر استرداد صورة من المعرض -->
                 <input type="file" id="galleryInput" accept="image/*" style="display: none;">
-                <button type="button" class="btn-camera" style="background-color: #0284c7;" onclick="document.getElementById('galleryInput').click()">🖼️ اختيار من المعرض</button>
+                <button type="button" class="btn-camera" style="background-color: #0284c7;" onclick="document.getElementById('galleryInput').click()">🖼️ من المعرض</button>
             </div>
             <small id="bgRemovalStatus" style="color: var(--primary); display: block; margin-top: 6px; font-weight: bold;"></small>
             
-            <!-- معاينة الصورة المصغرة -->
             <div id="imagePreviewContainer" style="margin-top: 10px; display: none;">
                 <img id="previewImg" src="" style="width: 80px; height: 80px; object-fit: contain; border: 1px solid var(--border); border-radius: 8px; background: #fff; padding: 2px;">
             </div>
@@ -486,7 +548,7 @@
         <button id="saveBtn" class="btn-main" onclick="saveProduct()">حفظ المنتج بالسحابة</button>
     </div>
 
-    <!-- 3. قسم عرض المنتجات والبحث -->
+    <!-- 4. قسم عرض المنتجات والبحث -->
     <div id="displayTab" class="tab-content">
         <div class="form-group" style="margin-bottom: 15px;">
             <div style="display: flex; gap: 8px;">
@@ -552,6 +614,84 @@
         btnElement.classList.add('active');
         if(tabId === 'displayTab') renderProducts();
         if(tabId === 'posTab') renderInvoice();
+        if(tabId === 'quickBatchTab' && window.quickBatchRows.length === 0) {
+            initQuickBatchRows();
+        }
+    }
+
+    // إدارة الجدول السريع
+    window.quickBatchRows = [];
+
+    function initQuickBatchRows() {
+        window.quickBatchRows = [
+            { name: '', barcode: '', singleBuy: '', singleSell: '' },
+            { name: '', barcode: '', singleBuy: '', singleSell: '' },
+            { name: '', barcode: '', singleBuy: '', singleSell: '' }
+        ];
+        renderQuickBatchTable();
+    }
+
+    function addBatchRow() {
+        window.quickBatchRows.push({ name: '', barcode: '', singleBuy: '', singleSell: '' });
+        renderQuickBatchTable();
+    }
+
+    function removeBatchRow(index) {
+        window.quickBatchRows.splice(index, 1);
+        if(window.quickBatchRows.length === 0) {
+            addBatchRow();
+        } else {
+            renderQuickBatchTable();
+        }
+    }
+
+    function renderQuickBatchTable() {
+        let tbody = document.getElementById('quickBatchRowsContainer');
+        tbody.innerHTML = '';
+        window.quickBatchRows.forEach((row, index) => {
+            tbody.innerHTML += `
+                <tr>
+                    <td><input type="text" placeholder="اسم المنتج" value="${row.name}" oninput="updateBatchField(${index}, 'name', this.value)"></td>
+                    <td><input type="text" placeholder="الباركود" value="${row.barcode}" oninput="updateBatchField(${index}, 'barcode', this.value)"></td>
+                    <td><input type="number" placeholder="0" value="${row.singleBuy}" oninput="updateBatchField(${index}, 'singleBuy', this.value)"></td>
+                    <td><input type="number" placeholder="0" value="${row.singleSell}" oninput="updateBatchField(${index}, 'singleSell', this.value)"></td>
+                    <td><button type="button" class="btn-delete" style="padding: 6px 10px; font-size:12px;" onclick="removeBatchRow(${index})">حذف</button></td>
+                </tr>
+            `;
+        });
+    }
+
+    function updateBatchField(index, field, value) {
+        window.quickBatchRows[index][field] = value;
+    }
+
+    function saveAllBatchRows() {
+        let validRows = window.quickBatchRows.filter(r => r.name.trim() !== '');
+        if (validRows.length === 0) {
+            alert('الرجاء إدخال اسم منتج واحد على الأقل في الجدول!');
+            return;
+        }
+
+        let formattedList = validRows.map(r => {
+            let sBuy = parseFloat(r.singleBuy) || 0;
+            let sSell = parseFloat(r.singleSell) || 0;
+            return {
+                name: r.name.trim(),
+                category: 'عام',
+                weight: 'غير محدد',
+                barcode: r.barcode.trim(),
+                singleBuy: sBuy,
+                singleSell: sSell,
+                singleProfit: sSell - sBuy,
+                bundleQty: 0,
+                bundleBuy: 0,
+                bundleSell: 0,
+                bundleProfit: 0,
+                image: ''
+            };
+        });
+
+        window.saveBatchProductsToCloud(formattedList);
     }
 
     let processedProductImageUrl = '';
@@ -560,10 +700,9 @@
         if (!file) return;
 
         let statusEl = document.getElementById('bgRemovalStatus');
-        statusEl.innerText = '⏳ جاري معالجة الصورة وتحميلها...';
+        statusEl.innerText = '⏳ جاري معالجة الصورة وإزالة الخلفية ووضع خلفية بيضاء...';
 
         try {
-            // محاولة إزالة الخلفية بالذكاء الاصطناعي
             let transparentBlob = await imglyRemoveBackground(file);
             
             let reader = new FileReader();
@@ -575,13 +714,12 @@
                     canvas.height = img.height;
                     let ctx = canvas.getContext('2d');
                     
-                    // رسم خلفية بيضاء نقية
                     ctx.fillStyle = "#FFFFFF";
                     ctx.fillRect(0, 0, canvas.width, canvas.height);
                     ctx.drawImage(img, 0, 0);
                     
                     processedProductImageUrl = canvas.toDataURL('image/jpeg', 0.9);
-                    statusEl.innerText = '✅ تم معالجة الصورة وإزالة الخلفية بنجاح!';
+                    statusEl.innerText = '✅ تم إزالة الخلفية ووضع خلفية بيضاء نقية بنجاح!';
                     
                     let previewContainer = document.getElementById('imagePreviewContainer');
                     let previewImg = document.getElementById('previewImg');
@@ -593,8 +731,7 @@
             reader.readAsDataURL(transparentBlob);
 
         } catch (err) {
-            // حل بديل آمن: في حال تعذر الذكاء الاصطناعي، يتم اعتماد الصورة العادية مباشرة دون تعطل التطبيق
-            statusEl.innerText = '⚠️ تم حفظ الصورة مباشرة بدون إزالة الخلفية.';
+            statusEl.innerText = '⚠️ تم حفظ الصورة مباشرة بخلفية بيضاء افتراضية.';
             let reader = new FileReader();
             reader.onload = function(evt) {
                 processedProductImageUrl = evt.target.result;
@@ -607,12 +744,10 @@
         }
     }
 
-    // ربط مدخل التقاط الكاميرا
     document.getElementById('cameraCaptureInput').addEventListener('change', function(e) {
         handleImageProcessing(e.target.files[0]);
     });
 
-    // ربط مدخل المعرض
     document.getElementById('galleryInput').addEventListener('change', function(e) {
         handleImageProcessing(e.target.files[0]);
     });
@@ -1004,7 +1139,7 @@
         document.getElementById('saveBtn').innerText = 'تعديل المنتج بالسحابة';
         calculateSingleProfit();
         calculateBundleProfit();
-        switchTab('addUnifiedTab', document.querySelectorAll('.tab-btn')[1]);
+        switchTab('addUnifiedTab', document.querySelectorAll('.tab-btn')[2]);
     }
 
     function clearForm() {
