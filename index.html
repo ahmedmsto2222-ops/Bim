@@ -4,14 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>تطبيق بيم الرضوان (سحابي)</title>
-    <!-- استيراد مكتبة قراءة الباركود المباشرة -->
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
-    <!-- استيراد مكتبة التعرف على النصوص من الصور OCR -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/4.0.2/tesseract.min.js"></script>
-    <!-- استيراد مكتبة إزالة الخلفية بالذكاء الاصطناعي -->
     <script src="https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.4.5/dist/index.umd.js"></script>
     
-    <!-- استيراد مكتبات Firebase (الإصدار 10 المتوافق مع الويب) -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getDatabase, ref, set, push, onValue, remove, update } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
@@ -61,7 +57,6 @@
                         const itemRef = ref(db, 'supermarket_products/' + exactMatch.id);
                         update(itemRef, productData).then(() => {
                             alert('✅ تم تحديث بيانات المنتج الموجود مسبقاً بنجاح!');
-                            clearForm();
                             switchTab('displayTab', document.querySelectorAll('.tab-btn')[3]);
                         }).catch(err => alert('خطأ في التحديث: ' + err.message));
                     }
@@ -71,14 +66,12 @@
                 const newRef = push(productsRef);
                 set(newRef, productData).then(() => {
                     alert('✅ تم حفظ المنتج ومشاركته مع شريكك بنجاح!');
-                    clearForm();
                     switchTab('displayTab', document.querySelectorAll('.tab-btn')[3]);
                 }).catch(err => alert('خطأ في الحفظ: ' + err.message));
             } else {
                 const itemRef = ref(db, 'supermarket_products/' + editId);
                 update(itemRef, productData).then(() => {
                     alert('✅ تم تعديل المنتج وتحديثه لدى شريكك بنجاح!');
-                    clearForm();
                     switchTab('displayTab', document.querySelectorAll('.tab-btn')[3]);
                 }).catch(err => alert('خطأ في التعديل: ' + err.message));
             }
@@ -270,7 +263,6 @@
             padding-bottom: 5px;
         }
 
-        button.btn-edit { background-color: var(--warning); color: white; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; }
         button.btn-delete { background-color: var(--danger); color: white; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; }
 
         .invoice-total-card {
@@ -324,39 +316,25 @@
         <button class="tab-btn" onclick="switchTab('displayTab', this)">📋 المنتجات</button>
     </div>
 
-    <!-- 1. قسم الكاشير والفاتورة -->
+    <!-- 1. قسم الكاشير -->
     <div id="posTab" class="tab-content active">
         <div class="invoice-total-card">
             <h3>إجمالي الفاتورة المطلوب دفعه</h3>
             <div class="total-amount" id="invoiceTotal">0.00 ₺</div>
         </div>
-
-        <div class="form-group">
-            <button type="button" id="scannerToggleBtn" class="btn-camera" style="background-color: var(--success); font-size: 18px; padding: 16px;" onclick="toggleLiveScanner('pos')">
-                📷 تشغيل كاميرا المسح الفوري
-            </button>
-        </div>
-
-        <div id="interactive-scanner-container" style="width: 100%; max-width: 400px; margin: 10px auto; display: none; border-radius: 12px; overflow: hidden; border: 2px solid var(--primary);">
-            <div id="reader"></div>
-        </div>
-        <button type="button" id="stopScannerBtn" style="display:none; background-color:var(--danger); color:white; border:none; padding:8px; width:100%; border-radius:8px; margin-bottom:15px; cursor:pointer;" onclick="stopLiveScanner()">إيقاف الكاميرا ❌</button>
-
         <div class="section-box">
-            <div class="section-title">🧾 تفاصيل سلة الزبون الحالية</div>
+            <div class="section-title">🧾 سلة الزبون</div>
             <div id="invoiceItemsContainer">
-                <p style="text-align: center; color: var(--text-muted); padding: 15px;">السلة فارغة، قم بتوجيه الكاميرا نحو الباركود لإضافته.</p>
+                <p style="text-align: center; color: var(--text-muted);">السلة فارغة</p>
             </div>
         </div>
-
-        <button class="btn-main" style="background-color: var(--primary);" onclick="checkoutInvoice()">إتمام البيع وتصفير الفاتورة ✅</button>
     </div>
 
-    <!-- 2. قسم الجدول السريع الشامل -->
+    <!-- 2. قسم الجدول السريع (الحساب المباشر فقط) -->
     <div id="quickBatchTab" class="tab-content">
         <div class="section-box">
-            <div class="section-title">⚡ الجدول السريع الشامل (حساب ثنائي الاتجاه ودقيق)</div>
-            <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">أدخل سعر القطعة مع عدد القطع ليحسب سعر الطرد تلقائياً وفوراً.</p>
+            <div class="section-title">⚡ الجدول السريع (حساب مباشر: سعر القطعة × عدد القطع = سعر الطرد)</div>
+            <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">أدخل سعر القطعة وعدد القطع، وسيتم حساب سعر الطرد تلقائياً.</p>
             
             <div style="overflow-x: auto;">
                 <table class="batch-table">
@@ -384,10 +362,8 @@
         </div>
     </div>
 
-    <!-- 3. قسم إضافة وحفظ المنتج بالطريقة العادية -->
+    <!-- 3. قسم إضافة مفردة -->
     <div id="addUnifiedTab" class="tab-content">
-        <input type="hidden" id="editDocId" value="">
-
         <div class="form-group">
             <label>اسم المنتج</label>
             <input type="text" id="productName" placeholder="أدخل اسم المنتج">
@@ -396,62 +372,56 @@
         <div class="form-grid">
             <div class="form-group">
                 <label>اسم التصنيف</label>
-                <input type="text" id="productCategory" placeholder="مثال: مشروبات، منظفات">
+                <input type="text" id="productCategory" placeholder="مثال: مشروبات">
             </div>
             <div class="form-group">
                 <label>الوزن</label>
-                <input type="text" id="productWeight" placeholder="أدخل وزن المنتج">
+                <input type="text" id="productWeight" placeholder="الوزن">
             </div>
         </div>
 
         <div class="form-group">
             <label>رقم الباركود</label>
-            <input type="text" id="productBarcode" placeholder="أدخل رقم الباركود">
+            <input type="text" id="productBarcode" placeholder="الباركود">
         </div>
 
         <div class="section-box">
-            <div class="section-title">📦 الطرد الكامل (حساب القطع تلقائياً)</div>
-            <div class="form-group" style="margin-bottom: 12px;">
-                <label>عدد القطع في الطرد الواحد</label>
-                <input type="number" id="bundleQty" placeholder="مثال: 12" oninput="calculateUnitFromBundle()">
+            <div class="section-title">📦 بيانات الطرد والقطع (حساب مباشر)</div>
+            <div class="form-group">
+                <label>عدد القطع في الطرد</label>
+                <input type="number" id="bundleQty" placeholder="مثال: 12" oninput="calculateDirectBundle()">
             </div>
-            <div class="form-grid">
-                <div class="form-group">
-                    <label>سعر شراء الطرد (₺)</label>
-                    <input type="number" id="bundleBuy" placeholder="0.00" oninput="calculateUnitFromBundle()">
-                </div>
-                <div class="form-group">
-                    <label>سعر بيع الطرد (₺)</label>
-                    <input type="number" id="bundleSell" placeholder="0.00" oninput="calculateUnitFromBundle()">
-                </div>
-            </div>
-            <div class="result-box" id="bundleResultDisplay" style="background: #d1fae5; color: #065f46;">ربح الطرد الكامل: 0.00 ₺</div>
-        </div>
-
-        <div class="section-box">
-            <div class="section-title">📦 البيع والشراء بالمفرد (للقطعة - حساب الطرد تلقائياً)</div>
             <div class="form-grid">
                 <div class="form-group">
                     <label>سعر شراء القطعة (₺)</label>
-                    <input type="number" id="singleBuy" placeholder="0.00" oninput="calculateBundleFromUnit()">
+                    <input type="number" id="singleBuy" placeholder="0.00" oninput="calculateDirectBundle()">
                 </div>
                 <div class="form-group">
                     <label>سعر بيع القطعة (₺)</label>
-                    <input type="number" id="singleSell" placeholder="0.00" oninput="calculateBundleFromUnit()">
+                    <input type="number" id="singleSell" placeholder="0.00" oninput="calculateDirectBundle()">
                 </div>
             </div>
-            <div class="result-box" id="singleResultDisplay">ربح القطعة: 0.00 ₺</div>
+            <div class="form-grid" style="margin-top: 10px;">
+                <div class="form-group">
+                    <label>سعر شراء الطرد (مفروض آلياً)</label>
+                    <input type="number" id="bundleBuy" placeholder="0.00" readonly style="background: #e2e8f0;">
+                </div>
+                <div class="form-group">
+                    <label>سعر بيع الطرد (مفروض آلياً)</label>
+                    <input type="number" id="bundleSell" placeholder="0.00" readonly style="background: #e2e8f0;">
+                </div>
+            </div>
+            <div class="result-box" id="singleResultDisplay">ربح القطعة الواحدة: 0.00 ₺</div>
         </div>
 
-        <button id="saveBtn" class="btn-main" onclick="saveProduct()">حفظ المنتج بالسحابة</button>
+        <button id="saveBtn" class="btn-main" onclick="saveSingleProduct()">حفظ المنتج بالسحابة</button>
     </div>
 
-    <!-- 4. قسم عرض المنتجات والبحث -->
+    <!-- 4. قسم عرض المنتجات -->
     <div id="displayTab" class="tab-content">
         <div class="form-group" style="margin-bottom: 15px;">
             <input type="text" id="searchInput" placeholder="🔍 ابحث بالاسم، التصنيف، أو رقم الباركود..." oninput="renderProducts()">
         </div>
-
         <div id="productsContainer">
             <p style="text-align: center; color: var(--text-muted);">جاري مزامنة المنتجات من السحابة...</p>
         </div>
@@ -470,7 +440,6 @@
         }
     }
 
-    // إدارة الجدول السريع الشامل مع الحساب الثنائي الدقيق
     window.quickBatchRows = [];
 
     function initQuickBatchRows() {
@@ -504,11 +473,11 @@
                     <td><input type="text" placeholder="الاسم" value="${row.name}" oninput="updateBatchField(${index}, 'name', this.value)"></td>
                     <td><input type="text" placeholder="الوزن" value="${row.weight}" oninput="updateBatchField(${index}, 'weight', this.value)"></td>
                     <td><input type="text" placeholder="باركود" value="${row.barcode}" oninput="updateBatchField(${index}, 'barcode', this.value)"></td>
-                    <td><input type="number" id="batch_sBuy_${index}" placeholder="0" value="${row.singleBuy}" oninput="calculateBatchDynamic(${index})"></td>
-                    <td><input type="number" id="batch_sSell_${index}" placeholder="0" value="${row.singleSell}" oninput="calculateBatchDynamic(${index})"></td>
-                    <td><input type="number" id="batch_bQty_${index}" placeholder="0" value="${row.bundleQty}" oninput="calculateBatchDynamic(${index})"></td>
-                    <td><input type="number" id="batch_bBuy_${index}" placeholder="0" value="${row.bundleBuy}" oninput="calculateBatchDynamic(${index})"></td>
-                    <td><input type="number" id="batch_bSell_${index}" placeholder="0" value="${row.bundleSell}" oninput="calculateBatchDynamic(${index})"></td>
+                    <td><input type="number" id="batch_sBuy_${index}" placeholder="0" value="${row.singleBuy}" oninput="calculateBatchDirect(${index})"></td>
+                    <td><input type="number" id="batch_sSell_${index}" placeholder="0" value="${row.singleSell}" oninput="calculateBatchDirect(${index})"></td>
+                    <td><input type="number" id="batch_bQty_${index}" placeholder="0" value="${row.bundleQty}" oninput="calculateBatchDirect(${index})"></td>
+                    <td><input type="number" id="batch_bBuy_${index}" placeholder="0" value="${row.bundleBuy}" readonly style="background:#f1f5f9;"></td>
+                    <td><input type="number" id="batch_bSell_${index}" placeholder="0" value="${row.bundleSell}" readonly style="background:#f1f5f9;"></td>
                     <td><button type="button" class="btn-delete" style="padding: 4px 6px; font-size:11px;" onclick="removeBatchRow(${index})">حذف</button></td>
                 </tr>
             `;
@@ -519,35 +488,27 @@
         window.quickBatchRows[index][field] = value;
     }
 
-    // دالة ديناميكية موحدة ومضمونة للحساب الفوري داخل الجدول السريع
-    function calculateBatchDynamic(index) {
+    // الحساب المباشر فقط داخل الجدول (سعر القطعة × عدد القطع = سعر الطرد)
+    function calculateBatchDirect(index) {
         let bQty = parseFloat(document.getElementById(`batch_bQty_${index}`).value) || 0;
         let sBuy = parseFloat(document.getElementById(`batch_sBuy_${index}`).value) || 0;
         let sSell = parseFloat(document.getElementById(`batch_sSell_${index}`).value) || 0;
-        let bBuy = parseFloat(document.getElementById(`batch_bBuy_${index}`).value) || 0;
-        let bSell = parseFloat(document.getElementById(`batch_bSell_${index}`).value) || 0;
 
-        // تحديث القيم في الذاكرة
         window.quickBatchRows[index].bundleQty = bQty;
         window.quickBatchRows[index].singleBuy = sBuy;
         window.quickBatchRows[index].singleSell = sSell;
-        window.quickBatchRows[index].bundleBuy = bBuy;
-        window.quickBatchRows[index].bundleSell = bSell;
 
-        // الحساب من القطعة إلى الطرد (ضرب القطعة في عدد القطع)
         if (bQty > 0) {
-            if (sBuy > 0) {
-                let calcBuy = (sBuy * bQty).toFixed(2);
-                window.quickBatchRows[index].bundleBuy = calcBuy;
-                let el = document.getElementById(`batch_bBuy_${index}`);
-                if (el) el.value = calcBuy;
-            }
-            if (sSell > 0) {
-                let calcSell = (sSell * bQty).toFixed(2);
-                window.quickBatchRows[index].bundleSell = calcSell;
-                let el = document.getElementById(`batch_bSell_${index}`);
-                if (el) el.value = calcSell;
-            }
+            let bBuy = (sBuy * bQty).toFixed(2);
+            let bSell = (sSell * bQty).toFixed(2);
+
+            window.quickBatchRows[index].bundleBuy = bBuy;
+            window.quickBatchRows[index].bundleSell = bSell;
+
+            let elBuy = document.getElementById(`batch_bBuy_${index}`);
+            let elSell = document.getElementById(`batch_bSell_${index}`);
+            if (elBuy) elBuy.value = bBuy;
+            if (elSell) elSell.value = bSell;
         }
     }
 
@@ -583,31 +544,44 @@
         window.saveBatchProductsToCloud(formattedList);
     }
 
-    // دوال الحساب للشاشة العادية (إضافة مفردة)
-    function calculateUnitFromBundle() {
-        let bQty = parseFloat(document.getElementById('bundleQty').value) || 0;
-        let bBuy = parseFloat(document.getElementById('bundleBuy').value) || 0;
-        let bSell = parseFloat(document.getElementById('bundleSell').value) || 0;
-
-        if (bQty > 0) {
-            if (bBuy > 0) document.getElementById('singleBuy').value = (bBuy / bQty).toFixed(2);
-            if (bSell > 0) document.getElementById('singleSell').value = (bSell / bQty).toFixed(2);
-            let profit = bSell - bBuy;
-            document.getElementById('bundleResultDisplay').innerText = `ربح الطرد الكامل: ${profit.toFixed(2)} ₺`;
-        }
-    }
-
-    function calculateBundleFromUnit() {
+    // الحساب المباشر للشاشة المفردة
+    function calculateDirectBundle() {
         let bQty = parseFloat(document.getElementById('bundleQty').value) || 0;
         let sBuy = parseFloat(document.getElementById('singleBuy').value) || 0;
         let sSell = parseFloat(document.getElementById('singleSell').value) || 0;
 
         if (bQty > 0) {
-            if (sBuy > 0) document.getElementById('bundleBuy').value = (sBuy * bQty).toFixed(2);
-            if (sSell > 0) document.getElementById('bundleSell').value = (sSell * bQty).toFixed(2);
+            let bBuy = (sBuy * bQty).toFixed(2);
+            let bSell = (sSell * bQty).toFixed(2);
+
+            document.getElementById('bundleBuy').value = bBuy;
+            document.getElementById('bundleSell').value = bSell;
+
             let profit = sSell - sBuy;
-            document.getElementById('singleResultDisplay').innerText = `ربح القطعة: ${profit.toFixed(2)} ₺`;
+            document.getElementById('singleResultDisplay').innerText = `ربح القطعة الواحدة: ${profit.toFixed(2)} ₺`;
         }
+    }
+
+    function saveSingleProduct() {
+        let name = document.getElementById('productName').value.trim();
+        if(!name) {
+            alert('الرجاء إدخال اسم المنتج');
+            return;
+        }
+        let productData = {
+            name: name,
+            category: document.getElementById('productCategory').value.trim() || 'عام',
+            weight: document.getElementById('productWeight').value.trim() || 'غير محدد',
+            barcode: document.getElementById('productBarcode').value.trim(),
+            singleBuy: parseFloat(document.getElementById('singleBuy').value) || 0,
+            singleSell: parseFloat(document.getElementById('singleSell').value) || 0,
+            singleProfit: (parseFloat(document.getElementById('singleSell').value) || 0) - (parseFloat(document.getElementById('singleBuy').value) || 0),
+            bundleQty: parseInt(document.getElementById('bundleQty').value) || 0,
+            bundleBuy: parseFloat(document.getElementById('bundleBuy').value) || 0,
+            bundleSell: parseFloat(document.getElementById('bundleSell').value) || 0,
+            image: ''
+        };
+        window.saveProductToCloud(productData, null);
     }
 </script>
 </body>
