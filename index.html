@@ -310,25 +310,6 @@
             padding: 6px;
             font-size: 12px;
         }
-
-        #ocrModal {
-            display: none;
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.6);
-            z-index: 9999;
-            justify-content: center;
-            align-items: center;
-        }
-        .ocr-modal-content {
-            background: #fff;
-            width: 90%;
-            max-width: 500px;
-            padding: 20px;
-            border-radius: 12px;
-            max-height: 90vh;
-            overflow-y: auto;
-        }
     </style>
 </head>
 <body>
@@ -375,7 +356,7 @@
     <div id="quickBatchTab" class="tab-content">
         <div class="section-box">
             <div class="section-title">⚡ الجدول السريع الشامل (حساب ثنائي الاتجاه ودقيق)</div>
-            <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">أدخل سعر الطرد ليحسب القطعة، أو أدخل سعر القطعة مع عدد القطع ليحسب سعر الطرد تلقائياً.</p>
+            <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">أدخل سعر القطعة مع عدد القطع ليحسب سعر الطرد تلقائياً وفوراً.</p>
             
             <div style="overflow-x: auto;">
                 <table class="batch-table">
@@ -409,11 +390,7 @@
 
         <div class="form-group">
             <label>اسم المنتج</label>
-            <div style="display: flex; gap: 8px;">
-                <input type="text" id="productName" placeholder="أدخل اسم المنتج أو استخدم الكاميرا">
-                <button type="button" class="btn-camera" style="width: 170px; background-color: #0284c7;" onclick="readProductNameWithCamera()">📷 التقاط واختيار اسم</button>
-            </div>
-            <small id="ocrStatus" style="color: var(--primary); display: block; margin-top: 4px; font-weight: bold;"></small>
+            <input type="text" id="productName" placeholder="أدخل اسم المنتج">
         </div>
 
         <div class="form-grid">
@@ -422,29 +399,21 @@
                 <input type="text" id="productCategory" placeholder="مثال: مشروبات، منظفات">
             </div>
             <div class="form-group">
-                <label>الوزن (مثال: 1 كغ، 500 غ)</label>
+                <label>الوزن</label>
                 <input type="text" id="productWeight" placeholder="أدخل وزن المنتج">
             </div>
         </div>
 
         <div class="form-group">
             <label>رقم الباركود</label>
-            <div style="display: flex; gap: 8px;">
-                <input type="text" id="productBarcode" placeholder="أدخل أو امسح الباركود">
-                <button type="button" class="btn-camera" style="width: 140px;" onclick="toggleLiveScanner('productBarcode')">مسح مباشر</button>
-            </div>
+            <input type="text" id="productBarcode" placeholder="أدخل رقم الباركود">
         </div>
-
-        <div id="add-scanner-container" style="width: 100%; max-width: 400px; margin: 10px auto; display: none; border-radius: 12px; overflow: hidden; border: 2px solid var(--primary);">
-            <div id="reader-add"></div>
-        </div>
-        <button type="button" id="stopAddScannerBtn" style="display:none; background-color:var(--danger); color:white; border:none; padding:8px; width:100%; border-radius:8px; margin-bottom:15px; cursor:pointer;" onclick="stopLiveScanner()">إيقاف الكاميرا ❌</button>
 
         <div class="section-box">
             <div class="section-title">📦 الطرد الكامل (حساب القطع تلقائياً)</div>
             <div class="form-group" style="margin-bottom: 12px;">
                 <label>عدد القطع في الطرد الواحد</label>
-                <input type="number" id="bundleQty" placeholder="مثال: 12 أو 24 قطعة" oninput="calculateUnitFromBundle()">
+                <input type="number" id="bundleQty" placeholder="مثال: 12" oninput="calculateUnitFromBundle()">
             </div>
             <div class="form-grid">
                 <div class="form-group">
@@ -480,16 +449,8 @@
     <!-- 4. قسم عرض المنتجات والبحث -->
     <div id="displayTab" class="tab-content">
         <div class="form-group" style="margin-bottom: 15px;">
-            <div style="display: flex; gap: 8px;">
-                <input type="text" id="searchInput" placeholder="🔍 ابحث بالاسم، التصنيف، أو رقم الباركود..." oninput="renderProducts()">
-                <button type="button" class="btn-camera" style="width: 140px;" onclick="toggleLiveScanner('searchInput')">مسح بالباركود</button>
-            </div>
+            <input type="text" id="searchInput" placeholder="🔍 ابحث بالاسم، التصنيف، أو رقم الباركود..." oninput="renderProducts()">
         </div>
-
-        <div id="search-scanner-container" style="width: 100%; max-width: 400px; margin: 10px auto; display: none; border-radius: 12px; overflow: hidden; border: 2px solid var(--primary);">
-            <div id="reader-search"></div>
-        </div>
-        <button type="button" id="stopSearchScannerBtn" style="display:none; background-color:var(--danger); color:white; border:none; padding:8px; width:100%; border-radius:8px; margin-bottom:15px; cursor:pointer;" onclick="stopLiveScanner()">إيقاف الكاميرا ❌</button>
 
         <div id="productsContainer">
             <p style="text-align: center; color: var(--text-muted);">جاري مزامنة المنتجات من السحابة...</p>
@@ -543,11 +504,11 @@
                     <td><input type="text" placeholder="الاسم" value="${row.name}" oninput="updateBatchField(${index}, 'name', this.value)"></td>
                     <td><input type="text" placeholder="الوزن" value="${row.weight}" oninput="updateBatchField(${index}, 'weight', this.value)"></td>
                     <td><input type="text" placeholder="باركود" value="${row.barcode}" oninput="updateBatchField(${index}, 'barcode', this.value)"></td>
-                    <td><input type="number" id="batch_sBuy_${index}" placeholder="0" value="${row.singleBuy}" oninput="calculateBatchFromUnit(${index})"></td>
-                    <td><input type="number" id="batch_sSell_${index}" placeholder="0" value="${row.singleSell}" oninput="calculateBatchFromUnit(${index})"></td>
-                    <td><input type="number" id="batch_bQty_${index}" placeholder="0" value="${row.bundleQty}" oninput="calculateBatchFromBundle(${index})"></td>
-                    <td><input type="number" id="batch_bBuy_${index}" placeholder="0" value="${row.bundleBuy}" oninput="calculateBatchFromBundle(${index})"></td>
-                    <td><input type="number" id="batch_bSell_${index}" placeholder="0" value="${row.bundleSell}" oninput="calculateBatchFromBundle(${index})"></td>
+                    <td><input type="number" id="batch_sBuy_${index}" placeholder="0" value="${row.singleBuy}" oninput="calculateBatchDynamic(${index})"></td>
+                    <td><input type="number" id="batch_sSell_${index}" placeholder="0" value="${row.singleSell}" oninput="calculateBatchDynamic(${index})"></td>
+                    <td><input type="number" id="batch_bQty_${index}" placeholder="0" value="${row.bundleQty}" oninput="calculateBatchDynamic(${index})"></td>
+                    <td><input type="number" id="batch_bBuy_${index}" placeholder="0" value="${row.bundleBuy}" oninput="calculateBatchDynamic(${index})"></td>
+                    <td><input type="number" id="batch_bSell_${index}" placeholder="0" value="${row.bundleSell}" oninput="calculateBatchDynamic(${index})"></td>
                     <td><button type="button" class="btn-delete" style="padding: 4px 6px; font-size:11px;" onclick="removeBatchRow(${index})">حذف</button></td>
                 </tr>
             `;
@@ -558,53 +519,34 @@
         window.quickBatchRows[index][field] = value;
     }
 
-    // الحساب الدقيق في الجدول السريع: من الطرد إلى القطعة
-    function calculateBatchFromBundle(index) {
-        let bQty = parseFloat(document.getElementById(`batch_bQty_${index}`).value) || 0;
-        let bBuy = parseFloat(document.getElementById(`batch_bBuy_${index}`).value) || 0;
-        let bSell = parseFloat(document.getElementById(`batch_bSell_${index}`).value) || 0;
-        
-        window.quickBatchRows[index].bundleQty = bQty;
-        window.quickBatchRows[index].bundleBuy = bBuy;
-        window.quickBatchRows[index].bundleSell = bSell;
-
-        if (bQty > 0) {
-            if (bBuy > 0) {
-                let sBuy = (bBuy / bQty).toFixed(2);
-                window.quickBatchRows[index].singleBuy = sBuy;
-                let el = document.getElementById(`batch_sBuy_${index}`);
-                if(el) el.value = sBuy;
-            }
-            if (bSell > 0) {
-                let sSell = (bSell / bQty).toFixed(2);
-                window.quickBatchRows[index].singleSell = sSell;
-                let el = document.getElementById(`batch_sSell_${index}`);
-                if(el) el.value = sSell;
-            }
-        }
-    }
-
-    // الحساب الدقيق في الجدول السريع: من القطعة إلى الطرد (ضرب سعر القطعة × عدد القطع)
-    function calculateBatchFromUnit(index) {
+    // دالة ديناميكية موحدة ومضمونة للحساب الفوري داخل الجدول السريع
+    function calculateBatchDynamic(index) {
         let bQty = parseFloat(document.getElementById(`batch_bQty_${index}`).value) || 0;
         let sBuy = parseFloat(document.getElementById(`batch_sBuy_${index}`).value) || 0;
         let sSell = parseFloat(document.getElementById(`batch_sSell_${index}`).value) || 0;
+        let bBuy = parseFloat(document.getElementById(`batch_bBuy_${index}`).value) || 0;
+        let bSell = parseFloat(document.getElementById(`batch_bSell_${index}`).value) || 0;
 
+        // تحديث القيم في الذاكرة
+        window.quickBatchRows[index].bundleQty = bQty;
         window.quickBatchRows[index].singleBuy = sBuy;
         window.quickBatchRows[index].singleSell = sSell;
+        window.quickBatchRows[index].bundleBuy = bBuy;
+        window.quickBatchRows[index].bundleSell = bSell;
 
+        // الحساب من القطعة إلى الطرد (ضرب القطعة في عدد القطع)
         if (bQty > 0) {
             if (sBuy > 0) {
-                let bBuy = (sBuy * bQty).toFixed(2);
-                window.quickBatchRows[index].bundleBuy = bBuy;
+                let calcBuy = (sBuy * bQty).toFixed(2);
+                window.quickBatchRows[index].bundleBuy = calcBuy;
                 let el = document.getElementById(`batch_bBuy_${index}`);
-                if(el) el.value = bBuy;
+                if (el) el.value = calcBuy;
             }
             if (sSell > 0) {
-                let bSell = (sSell * bQty).toFixed(2);
-                window.quickBatchRows[index].bundleSell = bSell;
+                let calcSell = (sSell * bQty).toFixed(2);
+                window.quickBatchRows[index].bundleSell = calcSell;
                 let el = document.getElementById(`batch_bSell_${index}`);
-                if(el) el.value = bSell;
+                if (el) el.value = calcSell;
             }
         }
     }
