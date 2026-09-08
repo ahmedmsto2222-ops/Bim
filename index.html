@@ -72,18 +72,29 @@
         .btn-danger { background-color: #dc2626; }
         .btn-info { background-color: #0284c7; }
         .btn-purple { background-color: #7c3aed; }
+        .btn-ocr { background-color: #d97706; }
         
+        .upload-boxes {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
         .upload-box {
             background: #eef2ff;
             border: 2px dashed #4f46e5;
             padding: 12px;
             border-radius: 8px;
             text-align: center;
-            margin-bottom: 15px;
+            flex: 1;
+            min-width: 250px;
+        }
+        .upload-box-ocr {
+            background: #fffbeb;
+            border: 2px dashed #d97706;
         }
         .upload-box label {
             cursor: pointer;
-            color: #4f46e5;
             font-weight: bold;
         }
         .upload-box input { display: none; }
@@ -125,28 +136,49 @@
             font-size: 10pt;
             color: #6b7280;
         }
+        #loadingOverlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 9999;
+            color: white;
+            font-size: 18pt;
+            text-align: center;
+            padding-top: 20vh;
+        }
         @media print {
             body { background: #ffffff; padding: 0; }
             .container { box-shadow: none; padding: 0; }
-            .controls, .upload-box, .btn-danger, .btn-purple, .del-col-btn, .action-col { display: none !important; }
+            .controls, .upload-boxes, .btn-danger, .btn-purple, .del-col-btn, .action-col { display: none !important; }
             td input { border: none !important; background: transparent !important; }
         }
     </style>
 </head>
 <body>
 
+    <div id="loadingOverlay">⏳ جاري قراءة وتحليل صورة الفاتورة واستخراج البيانات، يرجى الانتظار...</div>
+
     <div class="container">
         <div class="header">
             <h1>سوبر ماركت بيم الرضوان</h1>
-            <p>نظام إدارة الفواتير والأسعار والأعمدة المخصصة</p>
+            <p>نظام إدارة الفواتير والمخزون والتعرف على صور الفواتير بالذكاء الاصطناعي</p>
         </div>
 
-        <!-- صندوق رفع ملف الإكسل -->
-        <div class="upload-box">
-            <label for="excelFile">
-                📁 <strong>اضغط هنا لرفع ملف إكسل (.xlsx) لتحديث أو إضافة المنتجات فوراً</strong>
-            </label>
-            <input type="file" id="excelFile" accept=".xlsx, .xls, .csv" onchange="handleExcelUpload(event)">
+        <!-- صناديق الرفع (إكسل + صورة فاتورة) -->
+        <div class="upload-boxes">
+            <div class="upload-box">
+                <label for="excelFile">
+                    📁 <strong>رفع ملف إكسل (.xlsx)</strong>
+                </label>
+                <input type="file" id="excelFile" accept=".xlsx, .xls, .csv" onchange="handleExcelUpload(event)">
+            </div>
+            <div class="upload-box upload-box-ocr">
+                <label for="invoiceImage" style="color: #d97706;">
+                    📸 <strong>رفع صورة فاتورة (استخراج تلقائي للأسعار والمنتجات)</strong>
+                </label>
+                <input type="file" id="invoiceImage" accept="image/*" onchange="handleImageUpload(event)">
+            </div>
         </div>
 
         <div class="controls">
@@ -188,15 +220,15 @@
         ];
 
         try {
-            let savedCols = JSON.parse(localStorage.getItem('bim_invoice_cols_v7'));
-            let savedData = JSON.parse(localStorage.getItem('bim_invoice_data_v7'));
+            let savedCols = JSON.parse(localStorage.getItem('bim_invoice_cols_v8'));
+            let savedData = JSON.parse(localStorage.getItem('bim_invoice_data_v8'));
             if(savedCols && savedCols.length >= 6) invoiceColumns = savedCols;
             if(savedData && savedData.length > 0) invoiceData = savedData;
         } catch(e) {}
 
         function saveToStorage() {
-            localStorage.setItem('bim_invoice_data_v7', JSON.stringify(invoiceData));
-            localStorage.setItem('bim_invoice_cols_v7', JSON.stringify(invoiceColumns));
+            localStorage.setItem('bim_invoice_data_v8', JSON.stringify(invoiceData));
+            localStorage.setItem('bim_invoice_cols_v8', JSON.stringify(invoiceColumns));
         }
 
         function renderTable(dataToRender) {
@@ -239,11 +271,10 @@
         function updateData(id, field, value) {
             let trimmedVal = value.trim();
             if (field === 'name') {
-                // التحقق إذا كان الاسم الجديد موجوداً مسبقاً في منتج آخر
                 let existing = invoiceData.find(p => p.name.trim() === trimmedVal && p.id !== id);
                 if (existing) {
                     alert("⚠️ اسم المنتج موجود مسبقاً في الجدول! لا يمكن تكرار نفس الاسم.");
-                    renderTable(invoiceData); // إعادة عرض الجدول لإلغاء التعديل غير المسموح
+                    renderTable(invoiceData);
                     return;
                 }
             }
@@ -265,6 +296,7 @@
 
             item.pcs = pcsVal;
 
+            // حساب سعر شراء القطعة تلقائياً بناءً على (شراء الطرد ÷ عدد القطع) والعكس
             if (changedField === 'pcs' || changedField === 'buyBundle') {
                 item.buyBundle = buyBundleVal;
                 if (pcsVal > 0) {
@@ -316,14 +348,18 @@
             renderTable(invoiceData);
         }
 
-        // دالة إضافة منتج مع فحص الاسم الكامل (إذا وجد يتم تحديثه، وإلا يتم إضافته)
         function upsertProduct(prodData) {
             let cleanName = prodData.name.trim();
             if (!cleanName) return;
 
+            // حساب شراء القطعة تلقائياً قبل الحفظ لضمان الدقة
+            if (prodData.pcs > 0 && prodData.buyBundle > 0) {
+                prodData.buyUnit = +(prodData.buyBundle / prodData.pcs).toFixed(2);
+            }
+
             let existingIndex = invoiceData.findIndex(p => p.name.trim() === cleanName);
             if (existingIndex !== -1) {
-                // تحديث المنتج الموجود بنفس الاسم الكامل بدلاً من إضافته كجديد
+                // تحديث البيانات بدلاً من التكرار
                 invoiceData[existingIndex].pcs = prodData.pcs;
                 invoiceData[existingIndex].buyBundle = prodData.buyBundle;
                 invoiceData[existingIndex].sellBundle = prodData.sellBundle;
@@ -336,7 +372,6 @@
                     }
                 }
             } else {
-                // إضافة المنتج كجديد تماماً إذا لم يكن موجوداً
                 invoiceData.push(prodData);
             }
             saveToStorage();
@@ -360,6 +395,84 @@
 
             upsertProduct(newItem);
             renderTable(invoiceData);
+        }
+
+        // دالة قراءة ومعالجة صورة الفاتورة باستخدام OCR المجاني
+        async function handleImageUpload(event) {
+            let file = event.target.files[0];
+            if (!file) return;
+
+            document.getElementById('loadingOverlay').style.display = 'block';
+
+            let formData = new FormData();
+            formData.append('file', file);
+            formData.append('apikey', 'K82379058988957'); // مفتاح مجاني لخدمة OCR
+            formData.append('language', 'ara'); // دعم اللغة العربية
+            formData.append('isOverlayRequired', 'false');
+
+            try {
+                let response = await fetch('https://api.ocr.space/parse/image', {
+                    method: 'POST',
+                    body: formData
+                });
+                let result = await response.json();
+                document.getElementById('loadingOverlay').style.display = 'none';
+
+                if (result && result.ParsedResults && result.ParsedResults.length > 0) {
+                    let parsedText = result.ParsedResults[0].ParsedText;
+                    processExtractedInvoiceText(parsedText);
+                } else {
+                    alert("لم يتم العثور على نصوص واضحة داخل الصورة. تأكد من وضوح الفاتورة.");
+                }
+            } catch (err) {
+                document.getElementById('loadingOverlay').style.display = 'none';
+                alert("حدث خطأ أثناء الاتصال بخدمة قراءة الصور.");
+            }
+        }
+
+        // تحليل النصوص المستخرجة من الفاتورة واستخراج المنتجات والأسعار
+        function processExtractedInvoiceText(text) {
+            let lines = text.split('\n');
+            let addedCount = 0;
+            let updatedCount = 0;
+
+            lines.forEach((line, idx) => {
+                let cleanLine = line.trim();
+                if (cleanLine.length < 3) return;
+
+                // استخراج الأرقام من السطر للبحث عن الأسعار وعدد القطع
+                let numbers = cleanLine.match(/\d+(\.\d+)?/g);
+                
+                if (numbers && numbers.length >= 2) {
+                    // نفترض أن الأرقام الأخيرة تمثل الأسعار أو عدد القطع
+                    let buyPrice = parseFloat(numbers[numbers.length - 1]) || 0;
+                    let pcsCount = numbers.length >= 3 ? (parseFloat(numbers[numbers.length - 2]) || 1) : 1;
+                    
+                    // اسم المنتج هو باقي السطر بدون الأرقام الأخيرة
+                    let productName = cleanLine.replace(/[\d\.\,\-]+/g, '').trim();
+                    if (productName.length < 2) productName = `منتج فاتورة ${idx + 1}`;
+
+                    let newItem = {
+                        id: Date.now() + idx,
+                        name: productName,
+                        pcs: pcsCount > 100 ? 1 : pcsCount, // تجنب أرقام الفواتير الكبيرة كقطع
+                        buyBundle: buyPrice,
+                        sellBundle: +(buyPrice * 1.15).default ? +(buyPrice * 1.15).toFixed(2) : 0, // اقتراح سعر بيع مبدئي
+                        buyUnit: 0,
+                        sellUnit: 0,
+                        extra: {}
+                    };
+
+                    let existing = invoiceData.find(p => p.name.trim() === productName);
+                    if (existing) updatedCount++;
+                    else addedCount++;
+
+                    upsertProduct(newItem);
+                }
+            });
+
+            renderTable(invoiceData);
+            alert(`تم تحليل صورة الفاتورة بنجاح! 📸✨\n- تم تحديث المنتجات الموجودة: ${updatedCount}\n- تم إضافة منتجات جديدة مستخرجة: ${addedCount}\n(ملاحظة: تأكد من مراجعة الأسعار وعدد القطع يدوياً بعد الاستخراج).`);
         }
 
         function handleExcelUpload(event) {
@@ -405,18 +518,15 @@
                                     newItem.extra[invoiceColumns[c]] = row[c] !== undefined ? row[c] : '';
                                 }
 
-                                if (existing) {
-                                    updateCount++;
-                                } else {
-                                    addCount++;
-                                }
+                                if (existing) updateCount++;
+                                else addCount++;
 
                                 upsertProduct(newItem);
                             }
                         }
 
                         renderTable(invoiceData);
-                        alert(`تمت معالجة ملف الإكسل بنجاح! 🎉\n- تم تحديث المنتجات الموجودة مسبقاً: ${updateCount}\n- تم إضافة منتجات جديدة: ${addCount}`);
+                        alert(`تمت معالجة ملف الإكسل بنجاح! 🎉\n- تم تحديث المنتجات: ${updateCount}\n- تم إضافة منتجات جديدة: ${addCount}`);
                     }
                 } catch (err) {
                     alert("حدث خطأ أثناء قراءة ملف الإكسل.");
