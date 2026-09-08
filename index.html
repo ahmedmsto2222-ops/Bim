@@ -74,8 +74,8 @@
         .btn:hover { opacity: 0.9; }
         .btn-success { background-color: #059669; }
         .btn-danger { background-color: #dc2626; }
-        .btn-warning { background-color: #d97706; }
         .btn-info { background-color: #0284c7; }
+        .btn-purple { background-color: #7c3aed; }
         
         .upload-box {
             background: #eef2ff;
@@ -109,6 +109,17 @@
             color: white;
             font-weight: bold;
             font-size: 10.5pt;
+            position: relative;
+        }
+        th .del-col-btn {
+            background: #ef4444;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 2px 6px;
+            font-size: 9pt;
+            cursor: pointer;
+            margin-right: 8px;
         }
         td input {
             width: 90%;
@@ -123,9 +134,6 @@
             outline: 1px solid #4f46e5;
             border-radius: 4px;
         }
-        td:nth-child(2) input {
-            text-align: right;
-        }
         tr:nth-child(even) { background-color: #f9fafb; }
         .footer {
             margin-top: 20px;
@@ -137,7 +145,7 @@
         @media print {
             body { background: #ffffff; padding: 0; }
             .container { box-shadow: none; padding: 0; }
-            .controls, .upload-box, .btn-danger, .btn-warning, .action-col { display: none !important; }
+            .controls, .upload-box, .btn-danger, .btn-purple, .del-col-btn, .action-col { display: none !important; }
             td input { border: none !important; background: transparent !important; }
         }
     </style>
@@ -147,10 +155,10 @@
     <div class="container">
         <div class="header">
             <h1>سوبر ماركت بيم الرضوان</h1>
-            <p>نظام إدارة الفواتير والمخزون الداعم لملفات إكسل</p>
+            <p>نظام إدارة الفواتير والمخزون الداعم لملفات إكسل والأعمدة المخصصة</p>
         </div>
 
-        <!-- صندوق رفع ملف الإكسل المضاف خصيصاً لموقعك -->
+        <!-- صندوق رفع ملف الإكسل المدمج -->
         <div class="upload-box">
             <label for="excelFile">
                 📁 <strong>اضغط هنا لرفع ملف إكسل (.xlsx) وتحديث المنتجات فوراً</strong>
@@ -161,7 +169,7 @@
         <div class="controls">
             <input type="text" id="searchInput" placeholder="ابحث عن منتج بالاسم..." oninput="filterTable()">
             <button class="btn btn-success" onclick="addRow()">➕ إضافة منتج</button>
-            <button class="btn btn-warning" onclick="resetData()" title="استعادة القائمة الأصلية">🔄 استعادة الافتراضي</button>
+            <button class="btn btn-purple" onclick="addColumn()">➕ إضافة عمود</button>
             <button class="btn btn-info" onclick="exportToExcel()">📥 تصدير لإكسل</button>
             <button class="btn" onclick="window.print()" style="background-color: #1f2937;">🖨️ طباعة</button>
         </div>
@@ -169,13 +177,8 @@
         <div style="overflow-x: auto;">
             <table id="invoiceTable">
                 <thead>
-                    <tr>
-                        <th style="width: 6%;">الرقم</th>
-                        <th style="width: 32%;">اسم المنتج / الوصف</th>
-                        <th style="width: 12%;">الكمية</th>
-                        <th style="width: 18%;">سعر الطرد (₺)</th>
-                        <th style="width: 18%;">سعر القطعة (₺)</th>
-                        <th class="action-col" style="width: 14%;">إجراء</th>
+                    <tr id="tableHeaderRow">
+                        <!-- سيتم بناء أعمدة الجدول ديناميكياً هنا -->
                     </tr>
                 </thead>
                 <tbody id="tableBody">
@@ -185,14 +188,17 @@
         </div>
 
         <div class="footer">
-            <div>حالة النظام: <span style="color: #059669; font-weight: bold;">جاهز لاستقبال ملفات الإكسل ✅</span></div>
+            <div>حالة النظام: <span style="color: #059669; font-weight: bold;">جاهز ✅</span></div>
             <div>بيم الرضوان - 2026</div>
         </div>
     </div>
 
     <script>
-        // القائمة الافتراضية
-        const defaultData = [
+        // الأعمدة الافتراضية
+        let invoiceColumns = JSON.parse(localStorage.getItem('bim_invoice_cols')) || ["اسم المنتج", "الكمية", "سعر الطرد"];
+
+        // البيانات الافتراضية الأولية مع الحقول الديناميكية (extraProps)
+        const initialData = [
             { id: 1, name: "معارم معطرة صغيرة سائل", qty: 2, bundlePrice: 520.00 },
             { id: 2, name: "شامبو هيرابي 3 لتر 4 قطع", qty: 2, bundlePrice: 1290.00 },
             { id: 3, name: "بلسم هيرابي 3 لتر 4 قطع", qty: 1, bundlePrice: 645.00 },
@@ -212,40 +218,110 @@
             { id: 17, name: "شاي احمدي 400 غرام 24 قطعة", qty: 24, bundlePrice: 198.75 },
             { id: 18, name: "شاي حورجة 400 غرام", qty: 16, bundlePrice: 100.00 },
             { id: 19, name: "مربى بور 400 غرام", qty: 2, bundlePrice: 4150.00 },
-            { id: 20, name: "شاي نادي احمدي 900 غرام", qty: 1, bundlePrice: 100.00 },
+            { id: 20, name: "شاي نادي احمدי 900 غرام", qty: 1, bundlePrice: 100.00 },
             { id: 21, name: "ميم مكعب أصلي 6 قطع", qty: 1, bundlePrice: 480.00 },
             { id: 22, name: "شاي هاي بيست 900 غرام 20 قطعة", qty: 1, bundlePrice: 1875.00 },
             { id: 23, name: "حمص جيزل 12 غرام 900 قطعة", qty: 1, bundlePrice: 130.00 },
             { id: 24, name: "طون الهيل 48 قطعة", qty: 1, bundlePrice: 30.00 }
         ];
 
-        let invoiceData = JSON.parse(localStorage.getItem('bim_invoice_data')) || defaultData;
+        let invoiceData = JSON.parse(localStorage.getItem('bim_invoice_data')) || initialData;
 
         function saveToStorage() {
             localStorage.setItem('bim_invoice_data', JSON.stringify(invoiceData));
+            localStorage.setItem('bim_invoice_cols', JSON.stringify(invoiceColumns));
         }
 
         function renderTable(dataToRender) {
+            let headerRow = document.getElementById('tableHeaderRow');
             let tbody = document.getElementById('tableBody');
-            tbody.innerHTML = '';
+            
+            // 1. بناء الهيدر ديناميكياً
+            let headerHTML = `<th style="width: 5%;">الرقم</th>`;
+            invoiceColumns.forEach((colName, colIdx) => {
+                let delBtn = colIdx >= 3 ? `<button class="del-col-btn" onclick="deleteColumn(${colIdx})" title="حذف العمود">×</button>` : '';
+                headerHTML += `<th>${colName} ${delBtn}</th>`;
+            });
+            headerHTML += `<th style="width: 10%;" class="action-col">إجراء</th>`;
+            headerRow.innerHTML = headerHTML;
 
+            // 2. بناء محتوى الجدول ديناميكياً
+            tbody.innerHTML = '';
             dataToRender.forEach((item, index) => {
+                let tr = document.createElement('tr');
+                
+                let rowHTML = `<td>${index + 1}</td>`;
+                
+                // الأعمدة الأساسية الثلاثة الثابتة
                 let unitPrice = item.qty > 0 ? (item.bundlePrice / item.qty).toFixed(2) : 0;
                 
-                let tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td>${index + 1}</td>
-                    <td><input type="text" value="${item.name}" onchange="updateData(${item.id}, 'name', this.value)"></td>
-                    <td><input type="number" value="${item.qty}" oninput="updateData(${item.id}, 'qty', this.value)"></td>
-                    <td><input type="number" step="0.01" value="${item.bundlePrice}" oninput="updateData(${item.id}, 'bundlePrice', this.value)"></td>
-                    <td id="unit_${item.id}" style="font-weight: 600; color: #059669;">${unitPrice} ₺</td>
-                    <td class="action-col"><button class="btn btn-danger" style="padding: 4px 8px; font-size: 10px;" onclick="deleteRow(${item.id})">حذف</button></td>
-                `;
+                invoiceColumns.forEach((col, cIdx) => {
+                    if (cIdx === 0) {
+                        rowHTML += `<td><input type="text" value="${item.name || ''}" onchange="updateData(${item.id}, 'name', this.value)"></td>`;
+                    } else if (cIdx === 1) {
+                        rowHTML += `<td><input type="number" value="${item.qty !== undefined ? item.qty : 1}" oninput="updateData(${item.id}, 'qty', this.value)"></td>`;
+                    } else if (cIdx === 2) {
+                        rowHTML += `<td><input type="number" step="0.01" value="${item.bundlePrice !== undefined ? item.bundlePrice : 0}" oninput="updateData(${item.id}, 'bundlePrice', this.value)"></td>`;
+                    } else {
+                        // الأعمدة المخصصة المضافة حديثاً
+                        if(!item.extra) item.extra = {};
+                        let val = item.extra[col] !== undefined ? item.extra[col] : '';
+                        rowHTML += `<td><input type="text" value="${val}" onchange="updateExtraData(${item.id}, '${col}', this.value)"></td>`;
+                    }
+                });
+
+                // عمود سعر القطعة التلقائي المحسوب
+                // يمكن عرضه أو تركه كجزء من الأعمدة، هنا سنبقي حساب سعر القطعة كعمود افتراضي رابع إن أردت أو نتركه يتأثر بالأعمدة
+                rowHTML += `<td class="action-col"><button class="btn btn-danger" style="padding: 4px 8px; font-size: 10px;" onclick="deleteRow(${item.id})">حذف</button></td>`;
+                
+                tr.innerHTML = rowHTML;
                 tbody.appendChild(tr);
             });
         }
 
-        // ميزة قراءة ملف الإكسل المرفوع من جهازك
+        function updateData(id, field, value) {
+            let item = invoiceData.find(p => p.id === id);
+            if (!item) return;
+
+            if (field === 'name') item.name = value;
+            else if (field === 'qty') item.qty = parseFloat(value) || 0;
+            else if (field === 'bundlePrice') item.bundlePrice = parseFloat(value) || 0;
+
+            saveToStorage();
+        }
+
+        function updateExtraData(id, colName, value) {
+            let item = invoiceData.find(p => p.id === id);
+            if (!item) return;
+            if (!item.extra) item.extra = {};
+            item.extra[colName] = value;
+            saveToStorage();
+        }
+
+        function addColumn() {
+            let colName = prompt("أدخل اسم العمود الجديد (مثال: الملاحظات، المورد، التاريخ):");
+            if (!colName || colName.trim() === "") return;
+            
+            if (invoiceColumns.includes(colName.trim())) {
+                alert("هذا العمود موجود مسبقاً!");
+                return;
+            }
+
+            invoiceColumns.push(colName.trim());
+            saveToStorage();
+            renderTable(invoiceData);
+        }
+
+        function deleteColumn(colIdx) {
+            if (colIdx < 3) return; // منع حذف الأعمدة الأساسية
+            let colName = invoiceColumns[colIdx];
+            if (confirm(`هل أنت متكد من حذف العمود "${colName}"؟`)) {
+                invoiceColumns.splice(colIdx, 1);
+                saveToStorage();
+                renderTable(invoiceData);
+            }
+        }
+
         function handleExcelUpload(event) {
             let file = event.target.files[0];
             if (!file) return;
@@ -259,54 +335,52 @@
                     let worksheet = workbook.Sheets[firstSheetName];
                     let jsonSheet = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
 
-                    let newItems = [];
-                    // تخطي صف العناوين والبدء من السطر الثاني
-                    for (let i = 1; i < jsonSheet.length; i++) {
-                        let row = jsonSheet[i];
-                        if (row && row[0]) {
-                            newItems.push({
-                                id: Date.now() + i,
-                                name: String(row[0] || ''),
-                                qty: parseFloat(row[1]) || 1,
-                                bundlePrice: parseFloat(row[2]) || 0
-                            });
+                    if (jsonSheet.length > 0) {
+                        let headerRow = jsonSheet[0];
+                        // تحديث أعمدة الملف المرفوع إذا لزم الأمر
+                        for(let c = 3; c < headerRow.length; c++) {
+                            if(headerRow[c] && !invoiceColumns.includes(headerRow[c])) {
+                                invoiceColumns.push(headerRow[c]);
+                            }
+                        }
+
+                        let newItems = [];
+                        for (let i = 1; i < jsonSheet.length; i++) {
+                            let row = jsonSheet[i];
+                            if (row && row[0]) {
+                                let newItem = {
+                                    id: Date.now() + i,
+                                    name: String(row[0] || ''),
+                                    qty: parseFloat(row[1]) || 1,
+                                    bundlePrice: parseFloat(row[2]) || 0,
+                                    extra: {}
+                                };
+                                for(let c = 3; c < invoiceColumns.length; c++) {
+                                    newItem.extra[invoiceColumns[c]] = row[c] !== undefined ? row[c] : '';
+                                }
+                                newItems.push(newItem);
+                            }
+                        }
+
+                        if (newItems.length > 0) {
+                            invoiceData = invoiceData.concat(newItems);
+                            saveToStorage();
+                            renderTable(invoiceData);
+                            alert("تم رفع الملف وإضافة الأعمدة والبيانات بنجاح! 🎉");
                         }
                     }
-
-                    if (newItems.length > 0) {
-                        // دمج المنتجات الجديدة مع القديمة أو استبدالها حسب رغبتك (هنا نقوم بالدمج لتجنب ضياع القديم)
-                        invoiceData = invoiceData.concat(newItems);
-                        saveToStorage();
-                        renderTable(invoiceData);
-                        alert("تم رفع قراءة ملف الإكسل وإضافة المنتجات بنجاح! 🎉");
-                    } else {
-                        alert("لم يتم العثور على بيانات صالحة داخل الملف.");
-                    }
                 } catch (err) {
-                    alert("حدث خطأ أثناء قراءة ملف الإكسل. تأكد من تطابق الأعمدة.");
+                    alert("حدث خطأ أثناء قراءة ملف الإكسل.");
                 }
             };
             reader.readAsArrayBuffer(file);
         }
 
-        function updateData(id, field, value) {
-            let item = invoiceData.find(p => p.id === id);
-            if (!item) return;
-
-            if (field === 'name') item.name = value;
-            else if (field === 'qty') item.qty = parseFloat(value) || 0;
-            else if (field === 'bundlePrice') item.bundlePrice = parseFloat(value) || 0;
-
-            let unitPrice = item.qty > 0 ? (item.bundlePrice / item.qty).toFixed(2) : 0;
-            let unitElem = document.getElementById(`unit_${id}`);
-            if(unitElem) unitElem.innerText = unitPrice + ' ₺';
-
-            saveToStorage();
-        }
-
         function addRow() {
             let newId = Date.now();
-            invoiceData.push({ id: newId, name: "منتج جديد", qty: 1, bundlePrice: 0 });
+            let newItem = { id: newId, name: "منتج جديد", qty: 1, bundlePrice: 0, extra: {} };
+            invoiceColumns.slice(3).forEach(col => { newItem.extra[col] = ''; });
+            invoiceData.push(newItem);
             saveToStorage();
             renderTable(invoiceData);
         }
@@ -317,19 +391,18 @@
             renderTable(invoiceData);
         }
 
-        function resetData() {
-            if(confirm("هل تريد استعادة القائمة الافتراضية؟")) {
-                invoiceData = JSON.parse(JSON.stringify(defaultData));
-                saveToStorage();
-                renderTable(invoiceData);
-            }
-        }
-
         function exportToExcel() {
-            let worksheetData = [["اسم المنتج", "الكمية", "سعر الطرد"]];
+            let worksheetData = [[]];
+            invoiceColumns.forEach(col => worksheetData[0].push(col));
+
             invoiceData.forEach(item => {
-                worksheetData.push([item.name, item.qty, item.bundlePrice]);
+                let row = [item.name, item.qty, item.bundlePrice];
+                invoiceColumns.slice(3).forEach(col => {
+                    row.push(item.extra && item.extra[col] !== undefined ? item.extra[col] : '');
+                });
+                worksheetData.push(row);
             });
+
             let ws = XLSX.utils.aoa_to_sheet(worksheetData);
             let wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "الفاتورة");
