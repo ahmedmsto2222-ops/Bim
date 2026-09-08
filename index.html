@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <title>سوبر ماركت بيم الرضوان - إدارة الفواتير والمخزون</title>
+    <!-- مكتبة قراءة ملفات الإكسل برمجياً داخل المتصفح -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         @page {
             size: A4;
@@ -46,6 +48,7 @@
             justify-content: space-between;
             margin-bottom: 15px;
             gap: 10px;
+            align-items: center;
         }
         .controls input[type="text"] {
             padding: 8px 12px;
@@ -53,7 +56,7 @@
             border-radius: 6px;
             font-size: 10.5pt;
             flex: 1;
-            min-width: 200px;
+            min-width: 180px;
         }
         .btn {
             background-color: #4f46e5;
@@ -64,12 +67,33 @@
             padding: 8px 12px;
             border-radius: 6px;
             font-size: 10.5pt;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
         }
         .btn:hover { opacity: 0.9; }
         .btn-success { background-color: #059669; }
         .btn-danger { background-color: #dc2626; }
         .btn-warning { background-color: #d97706; }
+        .btn-info { background-color: #0284c7; }
         
+        .upload-box {
+            background: #eef2ff;
+            border: 2px dashed #4f46e5;
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+            margin-bottom: 15px;
+        }
+        .upload-box label {
+            cursor: pointer;
+            color: #4f46e5;
+            font-weight: bold;
+        }
+        .upload-box input {
+            display: none;
+        }
+
         table {
             width: 100%;
             border-collapse: collapse;
@@ -113,7 +137,7 @@
         @media print {
             body { background: #ffffff; padding: 0; }
             .container { box-shadow: none; padding: 0; }
-            .controls, .btn-danger, .btn-warning, .action-col { display: none !important; }
+            .controls, .upload-box, .btn-danger, .btn-warning, .action-col { display: none !important; }
             td input { border: none !important; background: transparent !important; }
         }
     </style>
@@ -123,14 +147,23 @@
     <div class="container">
         <div class="header">
             <h1>سوبر ماركت بيم الرضوان</h1>
-            <p>نظام إدارة الفواتير والمخزون (مع الحفظ التلقائي)</p>
+            <p>نظام إدارة الفواتير والمخزون الداعم لملفات إكسل</p>
+        </div>
+
+        <!-- صندوق رفع ملف الإكسل المضاف خصيصاً لموقعك -->
+        <div class="upload-box">
+            <label for="excelFile">
+                📁 <strong>اضغط هنا لرفع ملف إكسل (.xlsx) وتحديث المنتجات فوراً</strong>
+            </label>
+            <input type="file" id="excelFile" accept=".xlsx, .xls, .csv" onchange="handleExcelUpload(event)">
         </div>
 
         <div class="controls">
             <input type="text" id="searchInput" placeholder="ابحث عن منتج بالاسم..." oninput="filterTable()">
-            <button class="btn btn-success" onclick="addRow()">➕ إضافة منتج جديد</button>
+            <button class="btn btn-success" onclick="addRow()">➕ إضافة منتج</button>
             <button class="btn btn-warning" onclick="resetData()" title="استعادة القائمة الأصلية">🔄 استعادة الافتراضي</button>
-            <button class="btn" onclick="window.print()" style="background-color: #1f2937;">🖨️ طباعة الفاتورة</button>
+            <button class="btn btn-info" onclick="exportToExcel()">📥 تصدير لإكسل</button>
+            <button class="btn" onclick="window.print()" style="background-color: #1f2937;">🖨️ طباعة</button>
         </div>
 
         <div style="overflow-x: auto;">
@@ -152,13 +185,13 @@
         </div>
 
         <div class="footer">
-            <div>حالة الحفظ: <span style="color: #059669; font-weight: bold;">محفوظ تلقائياً في المتصفح ✅</span></div>
+            <div>حالة النظام: <span style="color: #059669; font-weight: bold;">جاهز لاستقبال ملفات الإكسل ✅</span></div>
             <div>بيم الرضوان - 2026</div>
         </div>
     </div>
 
     <script>
-        // القائمة الافتراضية الكاملة
+        // القائمة الافتراضية
         const defaultData = [
             { id: 1, name: "معارم معطرة صغيرة سائل", qty: 2, bundlePrice: 520.00 },
             { id: 2, name: "شامبو هيرابي 3 لتر 4 قطع", qty: 2, bundlePrice: 1290.00 },
@@ -186,7 +219,6 @@
             { id: 24, name: "طون الهيل 48 قطعة", qty: 1, bundlePrice: 30.00 }
         ];
 
-        // استرجاع البيانات المحفوظة أو استخدام الافتراضية
         let invoiceData = JSON.parse(localStorage.getItem('bim_invoice_data')) || defaultData;
 
         function saveToStorage() {
@@ -197,12 +229,12 @@
             let tbody = document.getElementById('tableBody');
             tbody.innerHTML = '';
 
-            dataToRender.forEach((item) => {
+            dataToRender.forEach((item, index) => {
                 let unitPrice = item.qty > 0 ? (item.bundlePrice / item.qty).toFixed(2) : 0;
                 
                 let tr = document.createElement('tr');
                 tr.innerHTML = `
-                    <td>${item.id}</td>
+                    <td>${index + 1}</td>
                     <td><input type="text" value="${item.name}" onchange="updateData(${item.id}, 'name', this.value)"></td>
                     <td><input type="number" value="${item.qty}" oninput="updateData(${item.id}, 'qty', this.value)"></td>
                     <td><input type="number" step="0.01" value="${item.bundlePrice}" oninput="updateData(${item.id}, 'bundlePrice', this.value)"></td>
@@ -211,6 +243,50 @@
                 `;
                 tbody.appendChild(tr);
             });
+        }
+
+        // ميزة قراءة ملف الإكسل المرفوع من جهازك
+        function handleExcelUpload(event) {
+            let file = event.target.files[0];
+            if (!file) return;
+
+            let reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    let data = new Uint8Array(e.target.result);
+                    let workbook = XLSX.read(data, { type: 'array' });
+                    let firstSheetName = workbook.SheetNames[0];
+                    let worksheet = workbook.Sheets[firstSheetName];
+                    let jsonSheet = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+                    let newItems = [];
+                    // تخطي صف العناوين والبدء من السطر الثاني
+                    for (let i = 1; i < jsonSheet.length; i++) {
+                        let row = jsonSheet[i];
+                        if (row && row[0]) {
+                            newItems.push({
+                                id: Date.now() + i,
+                                name: String(row[0] || ''),
+                                qty: parseFloat(row[1]) || 1,
+                                bundlePrice: parseFloat(row[2]) || 0
+                            });
+                        }
+                    }
+
+                    if (newItems.length > 0) {
+                        // دمج المنتجات الجديدة مع القديمة أو استبدالها حسب رغبتك (هنا نقوم بالدمج لتجنب ضياع القديم)
+                        invoiceData = invoiceData.concat(newItems);
+                        saveToStorage();
+                        renderTable(invoiceData);
+                        alert("تم رفع قراءة ملف الإكسل وإضافة المنتجات بنجاح! 🎉");
+                    } else {
+                        alert("لم يتم العثور على بيانات صالحة داخل الملف.");
+                    }
+                } catch (err) {
+                    alert("حدث خطأ أثناء قراءة ملف الإكسل. تأكد من تطابق الأعمدة.");
+                }
+            };
+            reader.readAsArrayBuffer(file);
         }
 
         function updateData(id, field, value) {
@@ -225,11 +301,11 @@
             let unitElem = document.getElementById(`unit_${id}`);
             if(unitElem) unitElem.innerText = unitPrice + ' ₺';
 
-            saveToStorage(); // حفظ التعديل فوراً
+            saveToStorage();
         }
 
         function addRow() {
-            let newId = invoiceData.length > 0 ? Math.max(...invoiceData.map(p => p.id)) + 1 : 1;
+            let newId = Date.now();
             invoiceData.push({ id: newId, name: "منتج جديد", qty: 1, bundlePrice: 0 });
             saveToStorage();
             renderTable(invoiceData);
@@ -242,11 +318,22 @@
         }
 
         function resetData() {
-            if(confirm("هل تريد حقاً استعادة القائمة الافتراضية وحذف المنتجات المضافة حديثاً؟")) {
+            if(confirm("هل تريد استعادة القائمة الافتراضية؟")) {
                 invoiceData = JSON.parse(JSON.stringify(defaultData));
                 saveToStorage();
                 renderTable(invoiceData);
             }
+        }
+
+        function exportToExcel() {
+            let worksheetData = [["اسم المنتج", "الكمية", "سعر الطرد"]];
+            invoiceData.forEach(item => {
+                worksheetData.push([item.name, item.qty, item.bundlePrice]);
+            });
+            let ws = XLSX.utils.aoa_to_sheet(worksheetData);
+            let wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "الفاتورة");
+            XLSX.writeFile(wb, "Bim_Al_Radwan_Export.xlsx");
         }
 
         function filterTable() {
