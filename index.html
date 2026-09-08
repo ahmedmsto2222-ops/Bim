@@ -2,9 +2,7 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>فاتورة بيم الرضوان - قراءة ملفات الإكسل مباشرة</title>
-    <!-- استدعاء مكتبة قراءة ملفات الإكسل من الإنترنت لتسهيل الرفع -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <title>سوبر ماركت بيم الرضوان - إدارة الفواتير</title>
     <style>
         @page {
             size: A4;
@@ -49,13 +47,11 @@
             margin-bottom: 15px;
             gap: 10px;
         }
-        .controls input[type="text"], .controls label.btn-upload {
+        .controls input[type="text"] {
             padding: 8px 12px;
             border: 1px solid #d1d5db;
             border-radius: 6px;
             font-size: 10.5pt;
-        }
-        .controls input[type="text"] {
             flex: 1;
             min-width: 200px;
         }
@@ -69,19 +65,9 @@
             border-radius: 6px;
             font-size: 10.5pt;
         }
-        .btn:hover {
-            opacity: 0.9;
-        }
+        .btn:hover { opacity: 0.9; }
         .btn-success { background-color: #059669; }
         .btn-danger { background-color: #dc2626; }
-        .btn-upload {
-            background-color: #d97706;
-            color: white;
-            display: inline-flex;
-            align-items: center;
-            gap: 5px;
-            cursor: pointer;
-        }
         
         table {
             width: 100%;
@@ -98,15 +84,6 @@
             color: white;
             font-weight: bold;
             font-size: 10.5pt;
-            position: relative;
-        }
-        th input {
-            background: transparent;
-            border: 1px dashed white;
-            color: white;
-            text-align: center;
-            font-weight: bold;
-            width: 80%;
         }
         td input {
             width: 90%;
@@ -124,9 +101,7 @@
         td:nth-child(2) input {
             text-align: right;
         }
-        tr:nth-child(even) {
-            background-color: #f9fafb;
-        }
+        tr:nth-child(even) { background-color: #f9fafb; }
         .footer {
             margin-top: 20px;
             display: flex;
@@ -135,21 +110,10 @@
             color: #6b7280;
         }
         @media print {
-            body {
-                background: #ffffff;
-                padding: 0;
-            }
-            .container {
-                box-shadow: none;
-                padding: 0;
-            }
-            .controls, .no-print, .btn-danger, .action-col {
-                display: none !important;
-            }
-            td input {
-                border: none !important;
-                background: transparent !important;
-            }
+            body { background: #ffffff; padding: 0; }
+            .container { box-shadow: none; padding: 0; }
+            .controls, .btn-danger, .action-col { display: none !important; }
+            td input { border: none !important; background: transparent !important; }
         }
     </style>
 </head>
@@ -158,89 +122,68 @@
     <div class="container">
         <div class="header">
             <h1>سوبر ماركت بيم الرضوان</h1>
-            <p>نظام قراءة ملفات الإكسل و إدارة الفواتير</p>
+            <p>نظام إدارة الفواتير والمشتريات</p>
         </div>
 
         <div class="controls">
             <input type="text" id="searchInput" placeholder="ابحث عن منتج بالاسم..." oninput="filterTable()">
-            <label class="btn btn-upload">
-                📂 رفع ملف إكسل <input type="file" id="excelFileInput" accept=".xlsx, .xls" style="display: none;" onchange="handleExcelUpload(event)">
-            </label>
             <button class="btn btn-success" onclick="addRow()">➕ إضافة صف</button>
-            <button class="btn" onclick="addColumn()">➕ إضافة عمود</button>
-            <button class="btn" onclick="window.print()" style="background-color: #1f2937;">🖨️ طباعة</button>
+            <button class="btn" onclick="window.print()" style="background-color: #1f2937;">🖨️ طباعة الفاتورة</button>
         </div>
 
         <div style="overflow-x: auto;">
             <table id="invoiceTable">
                 <thead>
-                    <tr id="tableHeaderRow">
+                    <tr>
                         <th style="width: 6%;">الرقم</th>
-                        <th style="width: 28%;">اسم المنتج / الوصف</th>
-                        <th style="width: 12%;">عدد القطع</th>
+                        <th style="width: 32%;">اسم المنتج / الوصف</th>
+                        <th style="width: 12%;">الكمية</th>
                         <th style="width: 18%;">سعر الطرد (₺)</th>
                         <th style="width: 18%;">سعر القطعة (₺)</th>
-                        <th class="action-col" style="width: 8%;">إجراء</th>
+                        <th class="action-col" style="width: 14%;">إجراء</th>
                     </tr>
                 </thead>
                 <tbody id="tableBody">
-                    <!-- الصفوف تتولد ديناميكياً -->
+                    <!-- البيانات مدرجة مسبقاً من صورتك بدقة -->
                 </tbody>
             </table>
         </div>
 
         <div class="footer">
             <div>تاريخ الإصدار: 2026-09-09</div>
-            <div>تم الاستخراج والتنظيم بواسطة نظام بيم الرضوان</div>
+            <div>تم التنظيم بواسطة نظام بيم الرضوان</div>
         </div>
     </div>
 
     <script>
-        let dynamicColumns = [];
-
         let invoiceData = [
-            { id: 1, name: "معارم معطرة صغيرة سائل", qty: 2, bundlePrice: 520.00, extraValues: {} },
-            { id: 2, name: "شامبو هيرابي 3 لتر 4 قطع", qty: 2, bundlePrice: 1290.00, extraValues: {} },
-            { id: 3, name: "بلسم هيرابي 3 لتر 4 قطع", qty: 1, bundlePrice: 645.00, extraValues: {} },
-            { id: 4, name: "حامو هيرابي 3 لتر 4 قطع", qty: 1, bundlePrice: 645.00, extraValues: {} },
-            { id: 5, name: "سنة البيرة الحبوب 800 مل 12 قطعة", qty: 1, bundlePrice: 400.00, extraValues: {} },
-            { id: 6, name: "حامو ملتان 15 قطعة", qty: 2, bundlePrice: 1550.00, extraValues: {} },
-            { id: 7, name: "طون التونسنا 24 قطعة", qty: 1, bundlePrice: 1385.00, extraValues: {} },
-            { id: 8, name: "القارة معكرونة، مكرونة، هامرية، هيمبرية 20 قطعة 500 غرام", qty: 1, bundlePrice: 475.00, extraValues: {} },
-            { id: 9, name: "كروصان 24/7 عدد 24 قطعة", qty: 1, bundlePrice: 160.00, extraValues: {} },
-            { id: 10, name: "واصل", qty: 1, bundlePrice: 260.00, extraValues: {} },
-            { id: 11, name: "فتاحاعات دولاب جر 50 قطعة", qty: 1, bundlePrice: 300.00, extraValues: {} },
-            { id: 12, name: "بودرة أطفال علبة هينس 12 قطعة", qty: 1, bundlePrice: 410.00, extraValues: {} },
-            { id: 13, name: "كاتشب 12 قطعة", qty: 1, bundlePrice: 2800.00, extraValues: {} },
-            { id: 14, name: "فاصوليا مقادة 900 غرام 12 قطعة", qty: 1, bundlePrice: 700.00, extraValues: {} },
-            { id: 15, name: "جبنة حمرا 100 قطعة", qty: 1, bundlePrice: 950.00, extraValues: {} },
-            { id: 16, name: "بذور دور 750 غرام 12 قطعة", qty: 1, bundlePrice: 5000.00, extraValues: {} },
-            { id: 17, name: "شاي احمدي 400 غرام 24 قطعة", qty: 24, bundlePrice: 198.75, extraValues: {} },
-            { id: 18, name: "شاي حورجة 400 غرام", qty: 16, bundlePrice: 100.00, extraValues: {} },
-            { id: 19, name: "مربى بور 400 غرام", qty: 2, bundlePrice: 4150.00, extraValues: {} },
-            { id: 20, name: "شاي نادي احمدي 900 غرام", qty: 1, bundlePrice: 100.00, extraValues: {} },
-            { id: 21, name: "ميم مكعب أصلي 6 قطع", qty: 1, bundlePrice: 480.00, extraValues: {} },
-            { id: 22, name: "شاي هاي بيست 900 غرام 20 قطعة", qty: 1, bundlePrice: 1875.00, extraValues: {} },
-            { id: 23, name: "حمص جيزل 12 غرام 900 قطعة", qty: 1, bundlePrice: 130.00, extraValues: {} },
-            { id: 24, name: "طون الهيل 48 قطعة", qty: 1, bundlePrice: 30.00, extraValues: {} }
+            { id: 1, name: "معارم معطرة صغيرة سائل", qty: 2, bundlePrice: 520.00 },
+            { id: 2, name: "شامبو هيرابي 3 لتر 4 قطع", qty: 2, bundlePrice: 1290.00 },
+            { id: 3, name: "بلسم هيرابي 3 لتر 4 قطع", qty: 1, bundlePrice: 645.00 },
+            { id: 4, name: "حامو هيرابي 3 لتر 4 قطع", qty: 1, bundlePrice: 645.00 },
+            { id: 5, name: "سنة البيرة الحبوب 800 مل 12 قطعة", qty: 1, bundlePrice: 400.00 },
+            { id: 6, name: "حامو ملتان 15 قطعة", qty: 2, bundlePrice: 1550.00 },
+            { id: 7, name: "طون التونسنا 24 قطعة", qty: 1, bundlePrice: 1385.00 },
+            { id: 8, name: "القارة معكرونة، مكرونة، هامرية، هيمبرية 20 قطعة 500 غرام", qty: 1, bundlePrice: 475.00 },
+            { id: 9, name: "كروصان 24/7 عدد 24 قطعة", qty: 1, bundlePrice: 160.00 },
+            { id: 10, name: "واصل", qty: 1, bundlePrice: 260.00 },
+            { id: 11, name: "فتاحاعات دولاب جر 50 قطعة", qty: 1, bundlePrice: 300.00 },
+            { id: 12, name: "بودرة أطفال علبة هينس 12 قطعة", qty: 1, bundlePrice: 410.00 },
+            { id: 13, name: "كاتشب 12 قطعة", qty: 1, bundlePrice: 2800.00 },
+            { id: 14, name: "فاصوليا مقادة 900 غرام 12 قطعة", qty: 1, bundlePrice: 700.00 },
+            { id: 15, name: "جبنة حمرا 100 قطعة", qty: 1, bundlePrice: 950.00 },
+            { id: 16, name: "بذور دور 750 غرام 12 قطعة", qty: 1, bundlePrice: 5000.00 },
+            { id: 17, name: "شاي احمدي 400 غرام 24 قطعة", qty: 24, bundlePrice: 198.75 },
+            { id: 18, name: "شاي حورجة 400 غرام", qty: 16, bundlePrice: 100.00 },
+            { id: 19, name: "مربى بور 400 غرام", qty: 2, bundlePrice: 4150.00 },
+            { id: 20, name: "شاي نادي احمدي 900 غرام", qty: 1, bundlePrice: 100.00 },
+            { id: 21, name: "ميم مكعب أصلي 6 قطع", qty: 1, bundlePrice: 480.00 },
+            { id: 22, name: "شاي هاي بيست 900 غرام 20 قطعة", qty: 1, bundlePrice: 1875.00 },
+            { id: 23, name: "حمص جيزل 12 غرام 900 قطعة", qty: 1, bundlePrice: 130.00 },
+            { id: 24, name: "طون الهيل 48 قطعة", qty: 1, bundlePrice: 30.00 }
         ];
 
         function renderTable(dataToRender) {
-            let headerRow = document.getElementById('tableHeaderRow');
-            let baseHeaderHTML = `
-                <th style="width: 6%;">الرقم</th>
-                <th style="width: 28%;">اسم المنتج / الوصف</th>
-                <th style="width: 12%;">عدد القطع</th>
-                <th style="width: 18%;">سعر الطرد (₺)</th>
-                <th style="width: 18%;">سعر القطعة (₺)</th>
-            `;
-            
-            dynamicColumns.forEach((colName, colIdx) => {
-                baseHeaderHTML += `<th><input type="text" value="${colName}" onchange="updateColumnName(${colIdx}, this.value)"> <button onclick="deleteColumn(${colIdx})" style="background:none;border:none;color:white;cursor:pointer;">❌</button></th>`;
-            });
-            baseHeaderHTML += `<th class="action-col" style="width: 8%;">إجراء</th>`;
-            headerRow.innerHTML = baseHeaderHTML;
-
             let tbody = document.getElementById('tableBody');
             tbody.innerHTML = '';
 
@@ -248,136 +191,40 @@
                 let unitPrice = item.qty > 0 ? (item.bundlePrice / item.qty).toFixed(2) : 0;
                 
                 let tr = document.createElement('tr');
-                let rowHTML = `
+                tr.innerHTML = `
                     <td>${item.id}</td>
                     <td><input type="text" value="${item.name}" onchange="updateData(${item.id}, 'name', this.value)"></td>
                     <td><input type="number" value="${item.qty}" oninput="updateData(${item.id}, 'qty', this.value)"></td>
                     <td><input type="number" step="0.01" value="${item.bundlePrice}" oninput="updateData(${item.id}, 'bundlePrice', this.value)"></td>
                     <td id="unit_${item.id}" style="font-weight: 600; color: #059669;">${unitPrice} ₺</td>
+                    <td class="action-col"><button class="btn btn-danger" style="padding: 4px 8px; font-size: 10px;" onclick="deleteRow(${item.id})">حذف</button></td>
                 `;
-
-                dynamicColumns.forEach((colName, colIdx) => {
-                    let val = (item.extraValues && item.extraValues[colIdx]) || '';
-                    rowHTML += `<td><input type="text" value="${val}" oninput="updateExtraValue(${item.id}, ${colIdx}, this.value)"></td>`;
-                });
-
-                rowHTML += `<td class="action-col"><button class="btn btn-danger" style="padding: 4px 8px; font-size: 10px;" onclick="deleteRow(${item.id})">حذف</button></td>`;
-                tr.innerHTML = rowHTML;
                 tbody.appendChild(tr);
             });
-        }
-
-        // قراءة ملف الإكسل الحقيقي (.xlsx / .xls) عبر المتصفح مباشرة
-        function handleExcelUpload(event) {
-            let file = event.target.files[0];
-            if (!file) return;
-
-            let reader = new FileReader();
-            reader.onload = function(e) {
-                try {
-                    let data = new Uint8Array(e.target.result);
-                    let workbook = XLSX.read(data, { type: 'array' });
-                    let firstSheetName = workbook.SheetNames[0];
-                    let worksheet = workbook.Sheets[firstSheetName];
-                    let jsonRows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-
-                    let newItems = [];
-                    let idCounter = 1;
-
-                    // تخطي صف العناوين البدء من السطر الثاني (index 1)
-                    for (let i = 1; i < jsonRows.length; i++) {
-                        let row = jsonRows[i];
-                        if (row && row.length >= 3 && row[0]) {
-                            newItems.push({
-                                id: idCounter++,
-                                name: String(row[0]).trim(),
-                                qty: parseFloat(row[1]) || 1,
-                                bundlePrice: parseFloat(row[2]) || 0,
-                                extraValues: {}
-                            });
-                        }
-                    }
-
-                    if (newItems.length > 0) {
-                        invoiceData = newItems;
-                        renderTable(invoiceData);
-                        alert("تم رفع وتحديث بيانات الإكسل بنجاح!");
-                    } else {
-                        alert("لم يتم العثور على بيانات كافية. تأكد أن الأعمدة مرتبة هكذا: (اسم المنتج في العمود الأول، الكمية في الثاني، السعر في الثالث).");
-                    }
-                } catch (error) {
-                    alert("حدث خطأ أثناء قراءة ملف الإكسل. تأكد من صحة الملف.");
-                }
-            };
-            reader.readAsArrayBuffer(file);
         }
 
         function updateData(id, field, value) {
             let item = invoiceData.find(p => p.id === id);
             if (!item) return;
 
-            if (field === 'name') {
-                item.name = value;
-            } else if (field === 'qty') {
-                item.qty = parseFloat(value) || 0;
-            } else if (field === 'bundlePrice') {
-                item.bundlePrice = parseFloat(value) || 0;
-            }
+            if (field === 'name') item.name = value;
+            else if (field === 'qty') item.qty = parseFloat(value) || 0;
+            else if (field === 'bundlePrice') item.bundlePrice = parseFloat(value) || 0;
 
             let unitPrice = item.qty > 0 ? (item.bundlePrice / item.qty).toFixed(2) : 0;
             let unitElem = document.getElementById(`unit_${id}`);
             if(unitElem) unitElem.innerText = unitPrice + ' ₺';
         }
 
-        function updateExtraValue(id, colIdx, value) {
-            let item = invoiceData.find(p => p.id === id);
-            if (!item) return;
-            if (!item.extraValues) item.extraValues = {};
-            item.extraValues[colIdx] = value;
-        }
-
         function addRow() {
             let newId = invoiceData.length > 0 ? Math.max(...invoiceData.map(p => p.id)) + 1 : 1;
-            let newProduct = {
-                id: newId,
-                name: "منتج جديد",
-                qty: 1,
-                bundlePrice: 0,
-                extraValues: {}
-            };
-            invoiceData.push(newProduct);
+            invoiceData.push({ id: newId, name: "منتج جديد", qty: 1, bundlePrice: 0 });
             renderTable(invoiceData);
         }
 
         function deleteRow(id) {
             invoiceData = invoiceData.filter(p => p.id !== id);
             renderTable(invoiceData);
-        }
-
-        function addColumn() {
-            let colName = prompt("أدخل اسم العمود الجديد:", "ملاحظات");
-            if (colName && colName.trim() !== "") {
-                dynamicColumns.push(colName.trim());
-                renderTable(invoiceData);
-            }
-        }
-
-        function updateColumnName(colIdx, newName) {
-            if (newName && newName.trim() !== "") {
-                dynamicColumns[colIdx] = newName.trim();
-            }
-        }
-
-        function deleteColumn(colIdx) {
-            if (confirm("هل أنت متأكد من حذف هذا العمود؟")) {
-                dynamicColumns.splice(colIdx, 1);
-                invoiceData.forEach(item => {
-                    if (item.extraValues) {
-                        delete item.extraValues[colIdx];
-                    }
-                });
-                renderTable(invoiceData);
-            }
         }
 
         function filterTable() {
