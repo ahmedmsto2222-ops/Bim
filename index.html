@@ -20,7 +20,7 @@
             font-size: 11pt;
         }
         .container {
-            max-width: 1250px;
+            max-width: 1350px;
             margin: 0 auto;
             background: #ffffff;
             padding: 20px;
@@ -107,10 +107,11 @@
             width: 100%;
             border-collapse: collapse;
             margin-top: 10px;
+            table-layout: auto; /* السماح بتوزيع المساحة بمرونة */
         }
         th, td {
             border: 1px solid #d1d5db;
-            padding: 8px 6px;
+            padding: 10px 8px;
             text-align: center;
         }
         th {
@@ -119,6 +120,18 @@
             font-weight: bold;
             font-size: 10pt;
         }
+        /* تخصيص عمود اسم المنتج ليكون واسعاً ويظهر كل النص بوضوح ومريح للقراءة */
+        .product-name-col {
+            width: 35% !important;
+            text-align: right !important;
+            padding-right: 12px !important;
+        }
+        .product-name-col input {
+            text-align: right !important;
+            width: 100% !important;
+            font-weight: 500;
+        }
+
         td input {
             width: 95%;
             border: none;
@@ -155,12 +168,12 @@
 </head>
 <body>
 
-    <div id="loadingOverlay">⏳ جاري قراءة جميع صفحات ملف الـ PDF بدقة وتحليل محتواه...<br><span id="progressText" style="font-size: 12pt; color: #fbbf24;">يرجى الانتظار...</span></div>
+    <div id="loadingOverlay">⏳ جاري قراءة الملف وتحليل محتواه...<br><span id="progressText" style="font-size: 12pt; color: #fbbf24;">يرجى الانتظار...</span></div>
 
     <div class="container">
         <div class="header">
             <h1>سوبر ماركت بيم الرضوان</h1>
-            <p>نظام إدارة الفواتير والمخزون - استخراج شامل لملفات الـ PDF</p>
+            <p>نظام إدارة الفواتير والمخزون - عرض واسع وواضح لأسماء المنتجات</p>
         </div>
 
         <!-- صناديق الرفع -->
@@ -173,7 +186,7 @@
             </div>
             <div class="upload-box upload-box-pdf">
                 <label for="pdfFile" style="color: #b91c1c;">
-                    📄 <strong>رفع ملف PDF (استخراج شامل لكل المنتجات والأسعار)</strong>
+                    📄 <strong>رفع ملف PDF (استخراج شامل)</strong>
                 </label>
                 <input type="file" id="pdfFile" accept=".pdf" onchange="handlePdfUpload(event)">
             </div>
@@ -182,7 +195,7 @@
         <div class="controls">
             <input type="text" id="searchInput" placeholder="ابحث عن منتج بالاسم..." oninput="filterTable()">
             <button class="btn btn-success" onclick="addNewProductPrompt()">➕ إضافة منتج</button>
-            <button class="btn btn-info" style="background-color: #d97706;" onclick="openPasteModal()">📋 إدخال النص يدوياً / مراجعة النصوص</button>
+            <button class="btn btn-info" style="background-color: #d97706;" onclick="openPasteModal()">📋 إدخال النص يدوياً</button>
             <button class="btn btn-purple" onclick="addColumn()">➕ إضافة عمود</button>
             <button class="btn btn-info" onclick="exportToExcel()">📥 تصدير لإكسل</button>
             <button class="btn" onclick="window.print()" style="background-color: #1f2937;">🖨️ طباعة</button>
@@ -214,32 +227,33 @@
         ];
 
         let invoiceData = [
-            { id: 1, name: "معارم معطرة صغيرة سائل", pcs: 2, buyBundle: 520.00, sellBundle: 600.00, buyUnit: 260.00, sellUnit: 300.00, extra: {} },
-            { id: 2, name: "شامبو هيرابي 3 لتر 4 قطع", pcs: 4, buyBundle: 1290.00, sellBundle: 1480.00, buyUnit: 322.50, sellUnit: 370.00, extra: {} }
+            { id: 1, name: "شاي الروحة 25 ظرف 48 قطعة", pcs: 48, buyBundle: 1750.00, sellBundle: 2100.00, buyUnit: 36.46, sellUnit: 43.75, extra: {} },
+            { id: 2, name: "رز احمدي 900 غرام '20' قطعة العرض : شاي احمد", pcs: 20, buyBundle: 1800.00, sellBundle: 2160.00, buyUnit: 90.00, sellUnit: 108.00, extra: {} }
         ];
 
         try {
-            let savedCols = JSON.parse(localStorage.getItem('bim_invoice_cols_v11'));
-            let savedData = JSON.parse(localStorage.getItem('bim_invoice_data_v11'));
+            let savedCols = JSON.parse(localStorage.getItem('bim_invoice_cols_v12'));
+            let savedData = JSON.parse(localStorage.getItem('bim_invoice_data_v12'));
             if(savedCols && savedCols.length >= 6) invoiceColumns = savedCols;
             if(savedData && savedData.length > 0) invoiceData = savedData;
         } catch(e) {}
 
         function saveToStorage() {
-            localStorage.setItem('bim_invoice_data_v11', JSON.stringify(invoiceData));
-            localStorage.setItem('bim_invoice_cols_v11', JSON.stringify(invoiceColumns));
+            localStorage.setItem('bim_invoice_data_v12', JSON.stringify(invoiceData));
+            localStorage.setItem('bim_invoice_cols_v12', JSON.stringify(invoiceColumns));
         }
 
         function renderTable(dataToRender) {
             let headerRow = document.getElementById('tableHeaderRow');
             let tbody = document.getElementById('tableBody');
             
-            let headerHTML = `<th style="width: 4%;">الرقم</th>`;
+            let headerHTML = `<th style="width: 5%;">الرقم</th>`;
             invoiceColumns.forEach((colName, colIdx) => {
                 let delBtn = colIdx >= 6 ? `<button class="del-col-btn" onclick="deleteColumn(${colIdx})" style="background: #ef4444; color: white; border: none; border-radius: 3px; padding: 1px 4px; font-size: 8pt; cursor: pointer; margin-right: 5px;">×</button>` : '';
-                headerHTML += `<th>${colName} ${delBtn}</th>`;
+                let thClass = colIdx === 0 ? ` class="product-name-col"` : '';
+                headerHTML += `<th${thClass}>${colName} ${delBtn}</th>`;
             });
-            headerHTML += `<th style="width: 8%;" class="action-col">إجراء</th>`;
+            headerHTML += `<th style="width: 7%;">إجراء</th>`;
             headerRow.innerHTML = headerHTML;
 
             tbody.innerHTML = '';
@@ -247,7 +261,8 @@
                 let tr = document.createElement('tr');
                 let rowHTML = `<td>${index + 1}</td>`;
                 
-                rowHTML += `<td><input type="text" value="${item.name || ''}" onchange="updateData(${item.id}, 'name', this.value)"></td>`;
+                // تفعيل صنف العرض الواسع لاسم المنتج مع محاذاة لليمين لقراءة مريحة
+                rowHTML += `<td class="product-name-col"><input type="text" value="${item.name || ''}" onchange="updateData(${item.id}, 'name', this.value)"></td>`;
                 rowHTML += `<td><input type="number" id="pcs_${item.id}" value="${item.pcs !== undefined ? item.pcs : 1}" oninput="calculateAndUpdate(${item.id}, 'pcs')"></td>`;
                 rowHTML += `<td><input type="number" step="0.01" id="buyBundle_${item.id}" value="${item.buyBundle !== undefined ? item.buyBundle : 0}" oninput="calculateAndUpdate(${item.id}, 'buyBundle')"></td>`;
                 rowHTML += `<td><input type="number" step="0.01" id="sellBundle_${item.id}" value="${item.sellBundle !== undefined ? item.sellBundle : 0}" oninput="calculateAndUpdate(${item.id}, 'sellBundle')"></td>`;
@@ -261,7 +276,7 @@
                     rowHTML += `<td><input type="text" value="${val}" onchange="updateExtraData(${item.id}, '${col}', this.value)"></td>`;
                 }
 
-                rowHTML += `<td class="action-col"><button class="btn btn-danger" style="padding: 3px 6px; font-size: 10px;" onclick="deleteRow(${item.id})">حذف</button></td>`;
+                rowHTML += `<td><button class="btn btn-danger" style="padding: 3px 6px; font-size: 10px;" onclick="deleteRow(${item.id})">حذف</button></td>`;
                 tr.innerHTML = rowHTML;
                 tbody.appendChild(tr);
             });
@@ -272,7 +287,7 @@
             if (field === 'name') {
                 let existing = invoiceData.find(p => p.name.trim() === trimmedVal && p.id !== id);
                 if (existing) {
-                    alert("⚠️ اسم المنتج موجود مسبقاً في الجدول! لا يمكن تكرار نفس الاسم.");
+                    alert("⚠️ اسم المنتج موجود مسبقاً في الجدول!");
                     renderTable(invoiceData);
                     return;
                 }
@@ -383,7 +398,6 @@
             renderTable(invoiceData);
         }
 
-        // قراءة ملف الـ PDF بالكامل صفحة بصفحة وترتيب الاحداثيات والنصوص
         async function handlePdfUpload(event) {
             let file = event.target.files[0];
             if (!file) return;
@@ -400,18 +414,16 @@
                     let fullExtractedText = "";
 
                     for (let i = 1; i <= pdf.numPages; i++) {
-                        progressText.innerText = `جاري قراءة وتحليل الصفحة ${i} من ${pdf.numPages}...`;
+                        progressText.innerText = `جاري قراءة الصفحة ${i} من ${pdf.numPages}...`;
                         let page = await pdf.getPage(i);
                         let textContent = await page.getTextContent();
                         
-                        // ترتيب العناصر حسب الموقع العمودي والأفقي لضمان دقة قراءة الجداول
                         let items = textContent.items.map(item => ({
                             str: item.str,
                             x: item.transform[4],
                             y: item.transform[5]
                         }));
 
-                        // تجميع النصوص حسب السطور التقريبية
                         items.sort((a, b) => Math.abs(b.y - a.y) > 5 ? b.y - a.y : a.x - b.x);
 
                         let lastY = null;
@@ -429,7 +441,6 @@
                     }
 
                     overlay.style.display = 'none';
-
                     if (fullExtractedText.trim() !== "") {
                         processExtractedText(fullExtractedText);
                     } else {
@@ -444,13 +455,12 @@
         }
 
         function openPasteModal() {
-            let textInput = prompt("قم بلصق نصوص الفاتورة هنا (كل منتج في سطر مع سعره وعدد القطع):");
+            let textInput = prompt("قم بلصق نصوص الفاتورة هنا:");
             if (textInput && textInput.trim() !== "") {
                 processExtractedText(textInput);
             }
         }
 
-        // تحليل النصوص المستخرجة بدقة واستخراج كافة الأرقام والأسماء
         function processExtractedText(text) {
             let lines = text.split('\n');
             let addedCount = 0;
@@ -460,15 +470,12 @@
                 let cleanLine = line.trim();
                 if (cleanLine.length < 3) return;
 
-                // استخراج الأرقام من السطر
                 let numbers = cleanLine.match(/\d+(\.\d+)?/g);
-                
                 if (numbers && numbers.length >= 1) {
                     let buyPrice = parseFloat(numbers[numbers.length - 1]) || 0;
                     let pcsCount = numbers.length >= 2 ? (parseFloat(numbers[numbers.length - 2]) || 1) : 1;
                     
-                    // استخراج اسم المنتج عبر استبعاد الأرقام والرموز
-                    let productName = cleanLine.replace(/[\d\.\,\-]+/g, ' ').replace(/\s+/g, ' ').trim();
+                    let productName = cleanLine.replace(/[\d\,\-\.]+/g, ' ').replace(/\s+/g, ' ').trim();
                     if (productName.length < 2) productName = `منتج فاتورة ${idx + 1}`;
 
                     let buyUnitCalc = pcsCount > 0 ? +(buyPrice / pcsCount).toFixed(2) : 0;
@@ -493,7 +500,7 @@
             });
 
             renderTable(invoiceData);
-            alert(`تم استخراج وفحص جميع صفحات الـ PDF بنجاح! 📊✨\n- المنتجات المحدثة: ${updatedCount}\n- المنتجات الجديدة المضافة: ${addedCount}\n(تم استخراج أسماء المنتجات، عدد القطع، سعر شراء الطرد، وحساب شراء القطعة تلقائياً لكل الملف).`);
+            alert(`تم استخراج وفحص المنتجات بنجاح! 📊\n- محدثة: ${updatedCount}\n- جديدة: ${addedCount}`);
         }
 
         function handleExcelUpload(event) {
@@ -547,7 +554,7 @@
                         }
 
                         renderTable(invoiceData);
-                        alert(`تمت معالجة ملف الإكسل بنجاح! 🎉\n- تم تحديث المنتجات: ${updateCount}\n- تم إضافة منتجات جديدة: ${addCount}`);
+                        alert(`تمت معالجة ملف الإكسل بنجاح وعرض الأسماء كاملة! 🎉\n- محدثة: ${updateCount}\n- جديدة: ${addCount}`);
                     }
                 } catch (err) {
                     alert("حدث خطأ أثناء قراءة ملف الإكسل.");
