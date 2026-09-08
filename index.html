@@ -5,6 +5,8 @@
     <title>سوبر ماركت بيم الرضوان - إدارة الفواتير والمخزون</title>
     <!-- مكتبة قراءة ملفات الإكسل برمجياً -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- مكتبة التعرف على النصوص محلياً Tesseract.js -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@v5/dist/tesseract.min.js"></script>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -72,7 +74,6 @@
         .btn-danger { background-color: #dc2626; }
         .btn-info { background-color: #0284c7; }
         .btn-purple { background-color: #7c3aed; }
-        .btn-ocr { background-color: #d97706; }
         
         .upload-boxes {
             display: flex;
@@ -140,32 +141,26 @@
             display: none;
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.5);
+            background: rgba(0,0,0,0.6);
             z-index: 9999;
             color: white;
-            font-size: 18pt;
+            font-size: 16pt;
             text-align: center;
             padding-top: 20vh;
-        }
-        @media print {
-            body { background: #ffffff; padding: 0; }
-            .container { box-shadow: none; padding: 0; }
-            .controls, .upload-boxes, .btn-danger, .btn-purple, .del-col-btn, .action-col { display: none !important; }
-            td input { border: none !important; background: transparent !important; }
         }
     </style>
 </head>
 <body>
 
-    <div id="loadingOverlay">⏳ جاري قراءة وتحليل صورة الفاتورة واستخراج البيانات، يرجى الانتظار...</div>
+    <div id="loadingOverlay">⏳ جاري تحميل وفحص صورة الفاتورة محلياً بالذكاء الاصطناعي (Tesseract)...<br><span id="progressText" style="font-size: 12pt; color: #fbbf24;">يرجى الانتظار قليلاً...</span></div>
 
     <div class="container">
         <div class="header">
             <h1>سوبر ماركت بيم الرضوان</h1>
-            <p>نظام إدارة الفواتير والمخزون والتعرف على صور الفواتير بالذكاء الاصطناعي</p>
+            <p>نظام إدارة الفواتير والمخزون والتعرف المحلي على صور الفواتير</p>
         </div>
 
-        <!-- صناديق الرفع (إكسل + صورة فاتورة) -->
+        <!-- صناديق الرفع (إكسل + صورة فاتورة + لصق نص الفاتورة) -->
         <div class="upload-boxes">
             <div class="upload-box">
                 <label for="excelFile">
@@ -175,15 +170,16 @@
             </div>
             <div class="upload-box upload-box-ocr">
                 <label for="invoiceImage" style="color: #d97706;">
-                    📸 <strong>رفع صورة فاتورة (استخراج تلقائي للأسعار والمنتجات)</strong>
+                    📸 <strong>رفع صورة فاتورة (استخراج محلي بالذكاء الاصطناعي)</strong>
                 </label>
-                <input type="file" id="invoiceImage" accept="image/*" onchange="handleImageUpload(event)">
+                <input type="file" id="invoiceImage" accept="image/*" onchange="handleImageUploadLocally(event)">
             </div>
         </div>
 
         <div class="controls">
             <input type="text" id="searchInput" placeholder="ابحث عن منتج بالاسم..." oninput="filterTable()">
             <button class="btn btn-success" onclick="addNewProductPrompt()">➕ إضافة منتج</button>
+            <button class="btn btn-info" style="background-color: #d97706;" onclick="openPasteModal()">📋 إدخال الفاتورة كنص سريع</button>
             <button class="btn btn-purple" onclick="addColumn()">➕ إضافة عمود</button>
             <button class="btn btn-info" onclick="exportToExcel()">📥 تصدير لإكسل</button>
             <button class="btn" onclick="window.print()" style="background-color: #1f2937;">🖨️ طباعة</button>
@@ -220,15 +216,15 @@
         ];
 
         try {
-            let savedCols = JSON.parse(localStorage.getItem('bim_invoice_cols_v8'));
-            let savedData = JSON.parse(localStorage.getItem('bim_invoice_data_v8'));
+            let savedCols = JSON.parse(localStorage.getItem('bim_invoice_cols_v9'));
+            let savedData = JSON.parse(localStorage.getItem('bim_invoice_data_v9'));
             if(savedCols && savedCols.length >= 6) invoiceColumns = savedCols;
             if(savedData && savedData.length > 0) invoiceData = savedData;
         } catch(e) {}
 
         function saveToStorage() {
-            localStorage.setItem('bim_invoice_data_v8', JSON.stringify(invoiceData));
-            localStorage.setItem('bim_invoice_cols_v8', JSON.stringify(invoiceColumns));
+            localStorage.setItem('bim_invoice_data_v9', JSON.stringify(invoiceData));
+            localStorage.setItem('bim_invoice_cols_v9', JSON.stringify(invoiceColumns));
         }
 
         function renderTable(dataToRender) {
@@ -296,7 +292,7 @@
 
             item.pcs = pcsVal;
 
-            // حساب سعر شراء القطعة تلقائياً بناءً على (شراء الطرد ÷ عدد القطع) والعكس
+            // حساب سعر شراء القطعة تلقائياً بناءً على (شراء الطرد ÷ عدد القطع)
             if (changedField === 'pcs' || changedField === 'buyBundle') {
                 item.buyBundle = buyBundleVal;
                 if (pcsVal > 0) {
@@ -305,8 +301,10 @@
                 }
             } else if (changedField === 'buyUnit') {
                 item.buyUnit = buyUnitVal;
-                item.buyBundle = +(buyUnitVal * pcsVal).toFixed(2);
-                document.getElementById(`buyBundle_${id}`).value = item.buyBundle;
+                if (pcsVal > 0) {
+                    item.buyBundle = +(buyUnitVal * pcsVal).toFixed(2);
+                    document.getElementById(`buyBundle_${id}`).value = item.buyBundle;
+                }
             } 
             
             if (changedField === 'sellBundle') {
@@ -352,14 +350,13 @@
             let cleanName = prodData.name.trim();
             if (!cleanName) return;
 
-            // حساب شراء القطعة تلقائياً قبل الحفظ لضمان الدقة
+            // حساب شراء القطعة تلقائياً قبل الحفظ
             if (prodData.pcs > 0 && prodData.buyBundle > 0) {
                 prodData.buyUnit = +(prodData.buyBundle / prodData.pcs).toFixed(2);
             }
 
             let existingIndex = invoiceData.findIndex(p => p.name.trim() === cleanName);
             if (existingIndex !== -1) {
-                // تحديث البيانات بدلاً من التكرار
                 invoiceData[existingIndex].pcs = prodData.pcs;
                 invoiceData[existingIndex].buyBundle = prodData.buyBundle;
                 invoiceData[existingIndex].sellBundle = prodData.sellBundle;
@@ -397,41 +394,45 @@
             renderTable(invoiceData);
         }
 
-        // دالة قراءة ومعالجة صورة الفاتورة باستخدام OCR المجاني
-        async function handleImageUpload(event) {
+        // قراءة صورة الفاتورة محلياً باستخدام Tesseract.js (تدعم العربية والإنجليزية)
+        async function handleImageUploadLocally(event) {
             let file = event.target.files[0];
             if (!file) return;
 
-            document.getElementById('loadingOverlay').style.display = 'block';
-
-            let formData = new FormData();
-            formData.append('file', file);
-            formData.append('apikey', 'K82379058988957'); // مفتاح مجاني لخدمة OCR
-            formData.append('language', 'ara'); // دعم اللغة العربية
-            formData.append('isOverlayRequired', 'false');
+            let overlay = document.getElementById('loadingOverlay');
+            let progressText = document.getElementById('progressText');
+            overlay.style.display = 'block';
 
             try {
-                let response = await fetch('https://api.ocr.space/parse/image', {
-                    method: 'POST',
-                    body: formData
-                });
-                let result = await response.json();
-                document.getElementById('loadingOverlay').style.display = 'none';
+                const worker = await Tesseract.createWorker('ara+eng');
+                
+                progressText.innerText = "جاري تحليل الصورة واستخراج النصوص...";
+                const ret = await worker.recognize(file);
+                await worker.terminate();
 
-                if (result && result.ParsedResults && result.ParsedResults.length > 0) {
-                    let parsedText = result.ParsedResults[0].ParsedText;
-                    processExtractedInvoiceText(parsedText);
+                overlay.style.display = 'none';
+                
+                if (ret && ret.data && ret.data.text) {
+                    processExtractedText(ret.data.text);
                 } else {
-                    alert("لم يتم العثور على نصوص واضحة داخل الصورة. تأكد من وضوح الفاتورة.");
+                    alert("لم يتم التعرف على نصوص واضحة في الصورة. جرب استخدام ميزة 'إدخال الفاتورة كنص سريع'.");
                 }
             } catch (err) {
-                document.getElementById('loadingOverlay').style.display = 'none';
-                alert("حدث خطأ أثناء الاتصال بخدمة قراءة الصور.");
+                overlay.style.display = 'none';
+                alert("حدث خطأ أثناء معالجة الصورة محلياً.");
             }
         }
 
-        // تحليل النصوص المستخرجة من الفاتورة واستخراج المنتجات والأسعار
-        function processExtractedInvoiceText(text) {
+        // نافذة لإدخال أو لصق نصوص الفاتورة مباشرة كبديل ذكي وسريع
+        function openPasteModal() {
+            let textInput = prompt("قم بلصق نصوص الفاتورة هنا (كل منتج في سطر مع سعره وعدد القطع):");
+            if (textInput && textInput.trim() !== "") {
+                processExtractedText(textInput);
+            }
+        }
+
+        // تحليل النصوص واستخراج المنتجات والأسعار وعدد القطع وحساب شراء القطعة
+        function processExtractedText(text) {
             let lines = text.split('\n');
             let addedCount = 0;
             let updatedCount = 0;
@@ -440,26 +441,25 @@
                 let cleanLine = line.trim();
                 if (cleanLine.length < 3) return;
 
-                // استخراج الأرقام من السطر للبحث عن الأسعار وعدد القطع
                 let numbers = cleanLine.match(/\d+(\.\d+)?/g);
                 
-                if (numbers && numbers.length >= 2) {
-                    // نفترض أن الأرقام الأخيرة تمثل الأسعار أو عدد القطع
+                if (numbers && numbers.length >= 1) {
                     let buyPrice = parseFloat(numbers[numbers.length - 1]) || 0;
-                    let pcsCount = numbers.length >= 3 ? (parseFloat(numbers[numbers.length - 2]) || 1) : 1;
+                    let pcsCount = numbers.length >= 2 ? (parseFloat(numbers[numbers.length - 2]) || 1) : 1;
                     
-                    // اسم المنتج هو باقي السطر بدون الأرقام الأخيرة
                     let productName = cleanLine.replace(/[\d\.\,\-]+/g, '').trim();
-                    if (productName.length < 2) productName = `منتج فاتورة ${idx + 1}`;
+                    if (productName.length < 2) productName = `منتج مستخرج ${idx + 1}`;
+
+                    let buyUnitCalc = pcsCount > 0 ? +(buyPrice / pcsCount).toFixed(2) : 0;
 
                     let newItem = {
                         id: Date.now() + idx,
                         name: productName,
-                        pcs: pcsCount > 100 ? 1 : pcsCount, // تجنب أرقام الفواتير الكبيرة كقطع
+                        pcs: pcsCount > 50 ? 1 : pcsCount, // تجنب القيم الكبيرة الخاطئة
                         buyBundle: buyPrice,
-                        sellBundle: +(buyPrice * 1.15).default ? +(buyPrice * 1.15).toFixed(2) : 0, // اقتراح سعر بيع مبدئي
-                        buyUnit: 0,
-                        sellUnit: 0,
+                        sellBundle: +(buyPrice * 1.2).toFixed(2), // سعر بيع افتراضي مبدئي
+                        buyUnit: buyUnitCalc,
+                        sellUnit: +(buyUnitCalc * 1.2).toFixed(2),
                         extra: {}
                     };
 
@@ -472,7 +472,7 @@
             });
 
             renderTable(invoiceData);
-            alert(`تم تحليل صورة الفاتورة بنجاح! 📸✨\n- تم تحديث المنتجات الموجودة: ${updatedCount}\n- تم إضافة منتجات جديدة مستخرجة: ${addedCount}\n(ملاحظة: تأكد من مراجعة الأسعار وعدد القطع يدوياً بعد الاستخراج).`);
+            alert(`تم استخراج ومعالجة الفاتورة بنجاح! 📊✨\n- المنتجات المحدثة: ${updatedCount}\n- المنتجات الجديدة المضافة: ${addedCount}\n(تم حساب سعر شراء القطعة تلقائياً بناءً على شراء الطرد ÷ عدد القطع).`);
         }
 
         function handleExcelUpload(event) {
@@ -555,6 +555,12 @@
             let wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "الفاتورة");
             XLSX.writeFile(wb, "Bim_Al_Radwan_Export.xlsx");
+        }
+
+        function filterText() {
+            let query = document.getElementById('searchInput').value.toLowerCase();
+            let filtered = invoiceData.filter(item => item.name.toLowerCase().includes(query));
+            renderTable(filtered);
         }
 
         function filterTable() {
