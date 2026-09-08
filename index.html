@@ -68,6 +68,7 @@
         .btn:hover { opacity: 0.9; }
         .btn-success { background-color: #059669; }
         .btn-danger { background-color: #dc2626; }
+        .btn-warning { background-color: #d97706; }
         
         table {
             width: 100%;
@@ -112,7 +113,7 @@
         @media print {
             body { background: #ffffff; padding: 0; }
             .container { box-shadow: none; padding: 0; }
-            .controls, .btn-danger, .action-col { display: none !important; }
+            .controls, .btn-danger, .btn-warning, .action-col { display: none !important; }
             td input { border: none !important; background: transparent !important; }
         }
     </style>
@@ -122,12 +123,13 @@
     <div class="container">
         <div class="header">
             <h1>سوبر ماركت بيم الرضوان</h1>
-            <p>نظام إدارة الفواتير والمشتريات الشامل</p>
+            <p>نظام إدارة الفواتير والمخزون (مع الحفظ التلقائي)</p>
         </div>
 
         <div class="controls">
             <input type="text" id="searchInput" placeholder="ابحث عن منتج بالاسم..." oninput="filterTable()">
             <button class="btn btn-success" onclick="addRow()">➕ إضافة منتج جديد</button>
+            <button class="btn btn-warning" onclick="resetData()" title="استعادة القائمة الأصلية">🔄 استعادة الافتراضي</button>
             <button class="btn" onclick="window.print()" style="background-color: #1f2937;">🖨️ طباعة الفاتورة</button>
         </div>
 
@@ -150,14 +152,14 @@
         </div>
 
         <div class="footer">
-            <div>تاريخ التحديث: 2026-09-09</div>
-            <div>بيم الرضوان - جميع المنتجات القديمة والجديدة مسجلة</div>
+            <div>حالة الحفظ: <span style="color: #059669; font-weight: bold;">محفوظ تلقائياً في المتصفح ✅</span></div>
+            <div>بيم الرضوان - 2026</div>
         </div>
     </div>
 
     <script>
-        // دمج كافة المنتجات (القديمة + الجديدة معاً)
-        let invoiceData = [
+        // القائمة الافتراضية الكاملة
+        const defaultData = [
             { id: 1, name: "معارم معطرة صغيرة سائل", qty: 2, bundlePrice: 520.00 },
             { id: 2, name: "شامبو هيرابي 3 لتر 4 قطع", qty: 2, bundlePrice: 1290.00 },
             { id: 3, name: "بلسم هيرابي 3 لتر 4 قطع", qty: 1, bundlePrice: 645.00 },
@@ -183,6 +185,13 @@
             { id: 23, name: "حمص جيزل 12 غرام 900 قطعة", qty: 1, bundlePrice: 130.00 },
             { id: 24, name: "طون الهيل 48 قطعة", qty: 1, bundlePrice: 30.00 }
         ];
+
+        // استرجاع البيانات المحفوظة أو استخدام الافتراضية
+        let invoiceData = JSON.parse(localStorage.getItem('bim_invoice_data')) || defaultData;
+
+        function saveToStorage() {
+            localStorage.setItem('bim_invoice_data', JSON.stringify(invoiceData));
+        }
 
         function renderTable(dataToRender) {
             let tbody = document.getElementById('tableBody');
@@ -215,17 +224,29 @@
             let unitPrice = item.qty > 0 ? (item.bundlePrice / item.qty).toFixed(2) : 0;
             let unitElem = document.getElementById(`unit_${id}`);
             if(unitElem) unitElem.innerText = unitPrice + ' ₺';
+
+            saveToStorage(); // حفظ التعديل فوراً
         }
 
         function addRow() {
             let newId = invoiceData.length > 0 ? Math.max(...invoiceData.map(p => p.id)) + 1 : 1;
             invoiceData.push({ id: newId, name: "منتج جديد", qty: 1, bundlePrice: 0 });
+            saveToStorage();
             renderTable(invoiceData);
         }
 
         function deleteRow(id) {
             invoiceData = invoiceData.filter(p => p.id !== id);
+            saveToStorage();
             renderTable(invoiceData);
+        }
+
+        function resetData() {
+            if(confirm("هل تريد حقاً استعادة القائمة الافتراضية وحذف المنتجات المضافة حديثاً؟")) {
+                invoiceData = JSON.parse(JSON.stringify(defaultData));
+                saveToStorage();
+                renderTable(invoiceData);
+            }
         }
 
         function filterTable() {
