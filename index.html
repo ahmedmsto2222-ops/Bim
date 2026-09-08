@@ -2,7 +2,7 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>سوبر ماركت بيم الرضوان - إدارة الفواتير</title>
+    <title>سوبر ماركت بيم الرضوان - إدارة الفواتير والمخزون</title>
     <style>
         @page {
             size: A4;
@@ -122,12 +122,12 @@
     <div class="container">
         <div class="header">
             <h1>سوبر ماركت بيم الرضوان</h1>
-            <p>نظام إدارة الفواتير والمشتريات</p>
+            <p>نظام إدارة الفواتير والمشتريات الشامل</p>
         </div>
 
         <div class="controls">
             <input type="text" id="searchInput" placeholder="ابحث عن منتج بالاسم..." oninput="filterTable()">
-            <button class="btn btn-success" onclick="addRow()">➕ إضافة صف</button>
+            <button class="btn btn-success" onclick="addRow()">➕ إضافة منتج جديد</button>
             <button class="btn" onclick="window.print()" style="background-color: #1f2937;">🖨️ طباعة الفاتورة</button>
         </div>
 
@@ -144,18 +144,19 @@
                     </tr>
                 </thead>
                 <tbody id="tableBody">
-                    <!-- البيانات مدرجة مسبقاً من صورتك بدقة -->
+                    <!-- سيتم تعبئة البيانات هنا تلقائياً -->
                 </tbody>
             </table>
         </div>
 
         <div class="footer">
-            <div>تاريخ الإصدار: 2026-09-09</div>
-            <div>تم التنظيم بواسطة نظام بيم الرضوان</div>
+            <div>تاريخ التحديث: 2026-09-09</div>
+            <div>بيم الرضوان - جميع المنتجات القديمة والجديدة مسجلة</div>
         </div>
     </div>
 
     <script>
+        // دمج كافة المنتجات (القديمة + الجديدة معاً)
         let invoiceData = [
             { id: 1, name: "معارم معطرة صغيرة سائل", qty: 2, bundlePrice: 520.00 },
             { id: 2, name: "شامبو هيرابي 3 لتر 4 قطع", qty: 2, bundlePrice: 1290.00 },
