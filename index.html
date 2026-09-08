@@ -2,7 +2,7 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>فاتورة بيم الرضوان - إدارة متقدمة للجدول</title>
+    <title>فاتورة بيم الرضوان - بدون المجموع</title>
     <style>
         @page {
             size: A4;
@@ -114,10 +114,6 @@
         tr:nth-child(even) {
             background-color: #f9fafb;
         }
-        .total-row {
-            font-weight: bold;
-            background-color: #eef2ff !important;
-        }
         .footer {
             margin-top: 20px;
             display: flex;
@@ -149,7 +145,7 @@
     <div class="container">
         <div class="header">
             <h1>سوبر ماركت بيم الرضوان</h1>
-            <p>تقرير الفاتورة المطور - إمكانية إضافة صفوف، أعمدة، وتعديل كامل</p>
+            <p>تقرير الفاتورة المطور - بدون سطر المجموع الكلي</p>
         </div>
 
         <div class="controls">
@@ -174,12 +170,6 @@
                 <tbody id="tableBody">
                     <!-- الصفوف تتولد ديناميكياً -->
                 </tbody>
-                <tfoot>
-                    <tr class="total-row" id="totalFooterRow">
-                        <td colspan="3" style="text-align: left;">المجموع الكلي:</td>
-                        <td colspan="3" id="grandTotalCell">28,980.00 ₺</td>
-                    </tr>
-                </tfoot>
             </table>
         </div>
 
@@ -190,10 +180,8 @@
     </div>
 
     <script>
-        // بيانات الأعمدة الأساسية (يمكن إضافة أعمدة مخصصة عليها)
-        let dynamicColumns = []; // تخزين أسماء الأعمدة الإضافية
+        let dynamicColumns = [];
 
-        // بيانات المنتجات الأصلية مستخرجة من الفاتورة
         let invoiceData = [
             { id: 1, name: "رز بيليك بر حبة طويلة 900 غرام", qty: 20, bundlePrice: 1135.00, extraValues: {} },
             { id: 2, name: "رز اسكندر 900 غرام", qty: 20, bundlePrice: 1510.00, extraValues: {} },
@@ -213,7 +201,6 @@
         ];
 
         function renderTable(dataToRender) {
-            // 1. بناء الهيدر الديناميكي
             let headerRow = document.getElementById('tableHeaderRow');
             let baseHeaderHTML = `
                 <th style="width: 6%;">الرقم</th>
@@ -223,14 +210,12 @@
                 <th style="width: 18%;">سعر القطعة (₺)</th>
             `;
             
-            // إضافة الأعمدة الإضافية للهيدر إن وجدت
             dynamicColumns.forEach((colName, colIdx) => {
                 baseHeaderHTML += `<th><input type="text" value="${colName}" onchange="updateColumnName(${colIdx}, this.value)"> <button onclick="deleteColumn(${colIdx})" style="background:none;border:none;color:white;cursor:pointer;">❌</button></th>`;
             });
             baseHeaderHTML += `<th class="action-col" style="width: 8%;">إجراء</th>`;
             headerRow.innerHTML = baseHeaderHTML;
 
-            // 2. بناء محتوى الجدول (tbody)
             let tbody = document.getElementById('tableBody');
             tbody.innerHTML = '';
 
@@ -246,7 +231,6 @@
                     <td id="unit_${item.id}" style="font-weight: 600; color: #059669;">${unitPrice} ₺</td>
                 `;
 
-                // إضافة خلايا الأعمدة الإضافية
                 dynamicColumns.forEach((colName, colIdx) => {
                     let val = (item.extraValues && item.extraValues[colIdx]) || '';
                     rowHTML += `<td><input type="text" value="${val}" oninput="updateExtraValue(${item.id}, ${colIdx}, this.value)"></td>`;
@@ -256,16 +240,6 @@
                 tr.innerHTML = rowHTML;
                 tbody.appendChild(tr);
             });
-
-            // تحديث الفوتر وcolspan بناءً على عدد الأعمدة الكلي
-            let totalColspan = 3;
-            let totalFooterRow = document.getElementById('totalFooterRow');
-            totalFooterRow.innerHTML = `
-                <td colspan="3" style="text-align: left;">المجموع الكلي:</td>
-                <td colspan="${2 + dynamicColumns.length}" id="grandTotalCell" style="text-align: right; padding-right: 20px;">28,980.00 ₺</td>
-            `;
-
-            updateGrandTotal();
         }
 
         function updateData(id, field, value) {
@@ -283,8 +257,6 @@
             let unitPrice = item.qty > 0 ? (item.bundlePrice / item.qty).toFixed(2) : 0;
             let unitElem = document.getElementById(`unit_${id}`);
             if(unitElem) unitElem.innerText = unitPrice + ' ₺';
-            
-            updateGrandTotal();
         }
 
         function updateExtraValue(id, colIdx, value) {
@@ -292,12 +264,6 @@
             if (!item) return;
             if (!item.extraValues) item.extraValues = {};
             item.extraValues[colIdx] = value;
-        }
-
-        function updateGrandTotal() {
-            let total = invoiceData.reduce((sum, item) => sum + (parseFloat(item.bundlePrice) || 0), 0);
-            let totalCell = document.getElementById('grandTotalCell');
-            if(totalCell) totalCell.innerText = total.toFixed(2) + ' ₺';
         }
 
         function addRow() {
@@ -335,7 +301,6 @@
         function deleteColumn(colIdx) {
             if (confirm("هل أنت متأكد من حذف هذا العمود بكل بياناته؟")) {
                 dynamicColumns.splice(colIdx, 1);
-                // تنظيف البيانات التابعة للعمود المحذوف
                 invoiceData.forEach(item => {
                     if (item.extraValues) {
                         delete item.extraValues[colIdx];
@@ -351,7 +316,6 @@
             renderTable(filtered);
         }
 
-        // التشغيل الأولي
         renderTable(invoiceData);
     </script>
 </body>
