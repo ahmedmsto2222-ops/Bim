@@ -2,13 +2,12 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>سوبر ماركت بيم الرضوان - استخراج الفواتير من PDF</title>
+    <title>سوبر ماركت بيم الرضوان - إدارة الفواتير والمخزون</title>
     <!-- مكتبة قراءة ملفات الإكسل برمجياً -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <!-- مكتبة قراءة ملفات PDF محلياً -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>
-        // إعداد مسار الـ Worker الخاص بـ PDF.js
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     </script>
     <style>
@@ -78,7 +77,6 @@
         .btn-danger { background-color: #dc2626; }
         .btn-info { background-color: #0284c7; }
         .btn-purple { background-color: #7c3aed; }
-        .btn-pdf { background-color: #b91c1c; }
         
         .upload-boxes {
             display: flex;
@@ -157,15 +155,15 @@
 </head>
 <body>
 
-    <div id="loadingOverlay">⏳ جاري قراءة وتحليل ملف الـ PDF واستخراج المنتجات...<br><span id="progressText" style="font-size: 12pt; color: #fbbf24;">يرجى الانتظار...</span></div>
+    <div id="loadingOverlay">⏳ جاري قراءة جميع صفحات ملف الـ PDF بدقة وتحليل محتواه...<br><span id="progressText" style="font-size: 12pt; color: #fbbf24;">يرجى الانتظار...</span></div>
 
     <div class="container">
         <div class="header">
             <h1>سوبر ماركت بيم الرضوان</h1>
-            <p>نظام إدارة الفواتير والمخزون - دعم قراءة ملفات الـ PDF محلياً</p>
+            <p>نظام إدارة الفواتير والمخزون - استخراج شامل لملفات الـ PDF</p>
         </div>
 
-        <!-- صناديق الرفع (إكسل + ملف PDF + لصق نص الفاتورة) -->
+        <!-- صناديق الرفع -->
         <div class="upload-boxes">
             <div class="upload-box">
                 <label for="excelFile">
@@ -175,7 +173,7 @@
             </div>
             <div class="upload-box upload-box-pdf">
                 <label for="pdfFile" style="color: #b91c1c;">
-                    📄 <strong>رفع فاتورة PDF (استخراج الأسماء والقطع والأسعار)</strong>
+                    📄 <strong>رفع ملف PDF (استخراج شامل لكل المنتجات والأسعار)</strong>
                 </label>
                 <input type="file" id="pdfFile" accept=".pdf" onchange="handlePdfUpload(event)">
             </div>
@@ -184,7 +182,7 @@
         <div class="controls">
             <input type="text" id="searchInput" placeholder="ابحث عن منتج بالاسم..." oninput="filterTable()">
             <button class="btn btn-success" onclick="addNewProductPrompt()">➕ إضافة منتج</button>
-            <button class="btn btn-info" style="background-color: #d97706;" onclick="openPasteModal()">📋 إدخال الفاتورة كنص سريع</button>
+            <button class="btn btn-info" style="background-color: #d97706;" onclick="openPasteModal()">📋 إدخال النص يدوياً / مراجعة النصوص</button>
             <button class="btn btn-purple" onclick="addColumn()">➕ إضافة عمود</button>
             <button class="btn btn-info" onclick="exportToExcel()">📥 تصدير لإكسل</button>
             <button class="btn" onclick="window.print()" style="background-color: #1f2937;">🖨️ طباعة</button>
@@ -221,15 +219,15 @@
         ];
 
         try {
-            let savedCols = JSON.parse(localStorage.getItem('bim_invoice_cols_v10'));
-            let savedData = JSON.parse(localStorage.getItem('bim_invoice_data_v10'));
+            let savedCols = JSON.parse(localStorage.getItem('bim_invoice_cols_v11'));
+            let savedData = JSON.parse(localStorage.getItem('bim_invoice_data_v11'));
             if(savedCols && savedCols.length >= 6) invoiceColumns = savedCols;
             if(savedData && savedData.length > 0) invoiceData = savedData;
         } catch(e) {}
 
         function saveToStorage() {
-            localStorage.setItem('bim_invoice_data_v10', JSON.stringify(invoiceData));
-            localStorage.setItem('bim_invoice_cols_v10', JSON.stringify(invoiceColumns));
+            localStorage.setItem('bim_invoice_data_v11', JSON.stringify(invoiceData));
+            localStorage.setItem('bim_invoice_cols_v11', JSON.stringify(invoiceColumns));
         }
 
         function renderTable(dataToRender) {
@@ -385,7 +383,7 @@
             renderTable(invoiceData);
         }
 
-        // قراءة ملف الـ PDF محلياً واستخراج محتواه النصي
+        // قراءة ملف الـ PDF بالكامل صفحة بصفحة وترتيب الاحداثيات والنصوص
         async function handlePdfUpload(event) {
             let file = event.target.files[0];
             if (!file) return;
@@ -398,21 +396,42 @@
                 let fileReader = new FileReader();
                 fileReader.onload = async function() {
                     let typedarray = new Uint8Array(this.result);
-                    
                     let pdf = await pdfjsLib.getDocument(typedarray).promise;
-                    let fullText = "";
+                    let fullExtractedText = "";
 
                     for (let i = 1; i <= pdf.numPages; i++) {
-                        progressText.innerText = `جاري قراءة الصفحة ${i} من ${pdf.numPages}...`;
+                        progressText.innerText = `جاري قراءة وتحليل الصفحة ${i} من ${pdf.numPages}...`;
                         let page = await pdf.getPage(i);
                         let textContent = await page.getTextContent();
-                        let pageText = textContent.items.map(item => item.str).join(" ");
-                        fullText += pageText + "\n";
+                        
+                        // ترتيب العناصر حسب الموقع العمودي والأفقي لضمان دقة قراءة الجداول
+                        let items = textContent.items.map(item => ({
+                            str: item.str,
+                            x: item.transform[4],
+                            y: item.transform[5]
+                        }));
+
+                        // تجميع النصوص حسب السطور التقريبية
+                        items.sort((a, b) => Math.abs(b.y - a.y) > 5 ? b.y - a.y : a.x - b.x);
+
+                        let lastY = null;
+                        let lineStr = "";
+                        items.forEach(item => {
+                            if (lastY === null || Math.abs(item.y - lastY) > 6) {
+                                if (lineStr.trim() !== "") fullExtractedText += lineStr + "\n";
+                                lineStr = item.str;
+                                lastY = item.y;
+                            } else {
+                                lineStr += " " + item.str;
+                            }
+                        });
+                        if (lineStr.trim() !== "") fullExtractedText += lineStr + "\n";
                     }
 
                     overlay.style.display = 'none';
-                    if (fullText.trim() !== "") {
-                        processExtractedText(fullText);
+
+                    if (fullExtractedText.trim() !== "") {
+                        processExtractedText(fullExtractedText);
                     } else {
                         alert("لم يتم العثور على نصوص واضحة داخل ملف الـ PDF.");
                     }
@@ -431,7 +450,7 @@
             }
         }
 
-        // تحليل النصوص (سواء من PDF أو نص لصق) واستخراج اسم المنتج، عدد القطع، وسعر الشراء للطرد والقطعة
+        // تحليل النصوص المستخرجة بدقة واستخراج كافة الأرقام والأسماء
         function processExtractedText(text) {
             let lines = text.split('\n');
             let addedCount = 0;
@@ -441,27 +460,27 @@
                 let cleanLine = line.trim();
                 if (cleanLine.length < 3) return;
 
+                // استخراج الأرقام من السطر
                 let numbers = cleanLine.match(/\d+(\.\d+)?/g);
                 
                 if (numbers && numbers.length >= 1) {
-                    let buyPrice = parseFloat(numbers[numbers.length - 1]) || 0; // سعر شراء الطرد الأخير غالباً
+                    let buyPrice = parseFloat(numbers[numbers.length - 1]) || 0;
                     let pcsCount = numbers.length >= 2 ? (parseFloat(numbers[numbers.length - 2]) || 1) : 1;
                     
-                    // تنظيف اسم المنتج بإزالة الأرقام والرموز
-                    let productName = cleanLine.replace(/[\d\.\,\-]+/g, '').trim();
+                    // استخراج اسم المنتج عبر استبعاد الأرقام والرموز
+                    let productName = cleanLine.replace(/[\d\.\,\-]+/g, ' ').replace(/\s+/g, ' ').trim();
                     if (productName.length < 2) productName = `منتج فاتورة ${idx + 1}`;
 
-                    // حساب سعر شراء القطعة تلقائياً (شراء الطرد ÷ عدد القطع)
                     let buyUnitCalc = pcsCount > 0 ? +(buyPrice / pcsCount).toFixed(2) : 0;
 
                     let newItem = {
                         id: Date.now() + idx,
                         name: productName,
-                        pcs: pcsCount > 100 ? 1 : pcsCount, // تجنب القراءات الخاطئة الكبيرة جداً
+                        pcs: (pcsCount > 100 || pcsCount <= 0) ? 1 : pcsCount,
                         buyBundle: buyPrice,
-                        sellBundle: +(buyPrice * 1.2).toFixed(2), // مقترح بيع طرد افتراضي
+                        sellBundle: +(buyPrice * 1.2).toFixed(2),
                         buyUnit: buyUnitCalc,
-                        sellUnit: +(buyUnitCalc * 1.2).toFixed(2), // مقترح بيع قطعة افتراضي
+                        sellUnit: +(buyUnitCalc * 1.2).toFixed(2),
                         extra: {}
                     };
 
@@ -474,7 +493,7 @@
             });
 
             renderTable(invoiceData);
-            alert(`تم استخراج تفاصيل الفاتورة من ملف الـ PDF بنجاح! 📄✨\n- المنتجات المحدثة: ${updatedCount}\n- المنتجات الجديدة المضافة: ${addedCount}\n(تم استخراج عدد القطع في الطرد، سعر شراء الطرد، وحساب سعر شراء القطعة تلقائياً).`);
+            alert(`تم استخراج وفحص جميع صفحات الـ PDF بنجاح! 📊✨\n- المنتجات المحدثة: ${updatedCount}\n- المنتجات الجديدة المضافة: ${addedCount}\n(تم استخراج أسماء المنتجات، عدد القطع، سعر شراء الطرد، وحساب شراء القطعة تلقائياً لكل الملف).`);
         }
 
         function handleExcelUpload(event) {
