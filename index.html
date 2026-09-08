@@ -144,18 +144,17 @@
         <!-- صندوق رفع ملف الإكسل -->
         <div class="upload-box">
             <label for="excelFile">
-                📁 <strong>اضغط هنا لرفع ملف إكسل (.xlsx) وتحديث المنتجات والأعمدة فوراً</strong>
+                📁 <strong>اضغط هنا لرفع ملف إكسل (.xlsx) لتحديث أو إضافة المنتجات فوراً</strong>
             </label>
             <input type="file" id="excelFile" accept=".xlsx, .xls, .csv" onchange="handleExcelUpload(event)">
         </div>
 
         <div class="controls">
             <input type="text" id="searchInput" placeholder="ابحث عن منتج بالاسم..." oninput="filterTable()">
-            <button class="btn btn-success" onclick="addRow()">➕ إضافة منتج</button>
+            <button class="btn btn-success" onclick="addNewProductPrompt()">➕ إضافة منتج</button>
             <button class="btn btn-purple" onclick="addColumn()">➕ إضافة عمود</button>
             <button class="btn btn-info" onclick="exportToExcel()">📥 تصدير لإكسل</button>
             <button class="btn" onclick="window.print()" style="background-color: #1f2937;">🖨️ طباعة</button>
-            <button class="btn btn-danger" onclick="resetTable()" title="مسح التخزين المؤقت وتحديث النسخة">🔄 إعادة ضبط الجدول</button>
         </div>
 
         <div style="overflow-x: auto;">
@@ -189,23 +188,15 @@
         ];
 
         try {
-            let savedCols = JSON.parse(localStorage.getItem('bim_invoice_cols_v6'));
-            let savedData = JSON.parse(localStorage.getItem('bim_invoice_data_v6'));
+            let savedCols = JSON.parse(localStorage.getItem('bim_invoice_cols_v7'));
+            let savedData = JSON.parse(localStorage.getItem('bim_invoice_data_v7'));
             if(savedCols && savedCols.length >= 6) invoiceColumns = savedCols;
             if(savedData && savedData.length > 0) invoiceData = savedData;
         } catch(e) {}
 
         function saveToStorage() {
-            localStorage.setItem('bim_invoice_data_v6', JSON.stringify(invoiceData));
-            localStorage.setItem('bim_invoice_cols_v6', JSON.stringify(invoiceColumns));
-        }
-
-        function resetTable() {
-            if(confirm("هل تريد حقاً إعادة ضبط الجدول ومسح البيانات المؤقتة؟")) {
-                localStorage.removeItem('bim_invoice_cols_v6');
-                localStorage.removeItem('bim_invoice_data_v6');
-                location.reload();
-            }
+            localStorage.setItem('bim_invoice_data_v7', JSON.stringify(invoiceData));
+            localStorage.setItem('bim_invoice_cols_v7', JSON.stringify(invoiceColumns));
         }
 
         function renderTable(dataToRender) {
@@ -228,10 +219,8 @@
                 rowHTML += `<td><input type="text" value="${item.name || ''}" onchange="updateData(${item.id}, 'name', this.value)"></td>`;
                 rowHTML += `<td><input type="number" id="pcs_${item.id}" value="${item.pcs !== undefined ? item.pcs : 1}" oninput="calculateAndUpdate(${item.id}, 'pcs')"></td>`;
                 rowHTML += `<td><input type="number" step="0.01" id="buyBundle_${item.id}" value="${item.buyBundle !== undefined ? item.buyBundle : 0}" oninput="calculateAndUpdate(${item.id}, 'buyBundle')"></td>`;
-                // بيع الطرد أصبح يدوي بالكامل
                 rowHTML += `<td><input type="number" step="0.01" id="sellBundle_${item.id}" value="${item.sellBundle !== undefined ? item.sellBundle : 0}" oninput="calculateAndUpdate(${item.id}, 'sellBundle')"></td>`;
                 rowHTML += `<td><input type="number" step="0.01" id="buyUnit_${item.id}" value="${item.buyUnit !== undefined ? item.buyUnit : 0}" oninput="calculateAndUpdate(${item.id}, 'buyUnit')"></td>`;
-                // بيع القطعة أصبح يدوي بالكامل
                 rowHTML += `<td><input type="number" step="0.01" id="sellUnit_${item.id}" value="${item.sellUnit !== undefined ? item.sellUnit : 0}" oninput="calculateAndUpdate(${item.id}, 'sellUnit')"></td>`;
 
                 for(let c = 6; c < invoiceColumns.length; c++) {
@@ -248,9 +237,19 @@
         }
 
         function updateData(id, field, value) {
+            let trimmedVal = value.trim();
+            if (field === 'name') {
+                // التحقق إذا كان الاسم الجديد موجوداً مسبقاً في منتج آخر
+                let existing = invoiceData.find(p => p.name.trim() === trimmedVal && p.id !== id);
+                if (existing) {
+                    alert("⚠️ اسم المنتج موجود مسبقاً في الجدول! لا يمكن تكرار نفس الاسم.");
+                    renderTable(invoiceData); // إعادة عرض الجدول لإلغاء التعديل غير المسموح
+                    return;
+                }
+            }
             let item = invoiceData.find(p => p.id === id);
             if (!item) return;
-            item.name = value;
+            item[field] = trimmedVal;
             saveToStorage();
         }
 
@@ -278,7 +277,6 @@
                 document.getElementById(`buyBundle_${id}`).value = item.buyBundle;
             } 
             
-            // تحديث القيم اليدوية لبيع الطرد وبيع القطعة دون فرض قيود تلقائية بينهما
             if (changedField === 'sellBundle') {
                 item.sellBundle = sellBundleVal;
             } else if (changedField === 'sellUnit') {
@@ -318,6 +316,52 @@
             renderTable(invoiceData);
         }
 
+        // دالة إضافة منتج مع فحص الاسم الكامل (إذا وجد يتم تحديثه، وإلا يتم إضافته)
+        function upsertProduct(prodData) {
+            let cleanName = prodData.name.trim();
+            if (!cleanName) return;
+
+            let existingIndex = invoiceData.findIndex(p => p.name.trim() === cleanName);
+            if (existingIndex !== -1) {
+                // تحديث المنتج الموجود بنفس الاسم الكامل بدلاً من إضافته كجديد
+                invoiceData[existingIndex].pcs = prodData.pcs;
+                invoiceData[existingIndex].buyBundle = prodData.buyBundle;
+                invoiceData[existingIndex].sellBundle = prodData.sellBundle;
+                invoiceData[existingIndex].buyUnit = prodData.buyUnit;
+                invoiceData[existingIndex].sellUnit = prodData.sellUnit;
+                if(prodData.extra) {
+                    if(!invoiceData[existingIndex].extra) invoiceData[existingIndex].extra = {};
+                    for(let key in prodData.extra) {
+                        invoiceData[existingIndex].extra[key] = prodData.extra[key];
+                    }
+                }
+            } else {
+                // إضافة المنتج كجديد تماماً إذا لم يكن موجوداً
+                invoiceData.push(prodData);
+            }
+            saveToStorage();
+        }
+
+        function addNewProductPrompt() {
+            let name = prompt("أدخل اسم المنتج الجديد:");
+            if (!name || name.trim() === "") return;
+            
+            let newItem = {
+                id: Date.now(),
+                name: name.trim(),
+                pcs: 1,
+                buyBundle: 0,
+                sellBundle: 0,
+                buyUnit: 0,
+                sellUnit: 0,
+                extra: {}
+            };
+            invoiceColumns.slice(6).forEach(col => { newItem.extra[col] = ''; });
+
+            upsertProduct(newItem);
+            renderTable(invoiceData);
+        }
+
         function handleExcelUpload(event) {
             let file = event.target.files[0];
             if (!file) return;
@@ -338,13 +382,18 @@
                             }
                         }
 
-                        let newItems = [];
+                        let updateCount = 0;
+                        let addCount = 0;
+
                         for (let i = 1; i < jsonSheet.length; i++) {
                             let row = jsonSheet[i];
                             if (row && row[0]) {
+                                let productName = String(row[0]).trim();
+                                let existing = invoiceData.find(p => p.name.trim() === productName);
+                                
                                 let newItem = {
-                                    id: Date.now() + i,
-                                    name: String(row[0] || ''),
+                                    id: existing ? existing.id : (Date.now() + i),
+                                    name: productName,
                                     pcs: parseFloat(row[1]) || 1,
                                     buyBundle: parseFloat(row[2]) || 0,
                                     sellBundle: parseFloat(row[3]) || 0,
@@ -355,30 +404,25 @@
                                 for(let c = 6; c < invoiceColumns.length; c++) {
                                     newItem.extra[invoiceColumns[c]] = row[c] !== undefined ? row[c] : '';
                                 }
-                                newItems.push(newItem);
+
+                                if (existing) {
+                                    updateCount++;
+                                } else {
+                                    addCount++;
+                                }
+
+                                upsertProduct(newItem);
                             }
                         }
 
-                        if (newItems.length > 0) {
-                            invoiceData = invoiceData.concat(newItems);
-                            saveToStorage();
-                            renderTable(invoiceData);
-                            alert("تم رفع الملف وتحديث البيانات بنجاح! 🎉");
-                        }
+                        renderTable(invoiceData);
+                        alert(`تمت معالجة ملف الإكسل بنجاح! 🎉\n- تم تحديث المنتجات الموجودة مسبقاً: ${updateCount}\n- تم إضافة منتجات جديدة: ${addCount}`);
                     }
                 } catch (err) {
                     alert("حدث خطأ أثناء قراءة ملف الإكسل.");
                 }
             };
             reader.readAsArrayBuffer(file);
-        }
-
-        function addRow() {
-            let newItem = { id: Date.now(), name: "منتج جديد", pcs: 1, buyBundle: 0, sellBundle: 0, buyUnit: 0, sellUnit: 0, extra: {} };
-            invoiceColumns.slice(6).forEach(col => { newItem.extra[col] = ''; });
-            invoiceData.push(newItem);
-            saveToStorage();
-            renderTable(invoiceData);
         }
 
         function deleteRow(id) {
