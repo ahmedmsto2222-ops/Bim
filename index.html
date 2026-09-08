@@ -3,13 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <title>سوبر ماركت بيم الرضوان - إدارة الفواتير والمخزون</title>
-    <!-- مكتبة قراءة ملفات الإكسل برمجياً داخل المتصفح -->
+    <!-- مكتبة قراءة ملفات الإكسل برمجياً -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
-        @page {
-            size: A4;
-            margin: 10mm;
-        }
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             color: #1f2937;
@@ -19,7 +15,7 @@
             font-size: 11pt;
         }
         .container {
-            max-width: 1100px;
+            max-width: 1250px;
             margin: 0 auto;
             background: #ffffff;
             padding: 20px;
@@ -90,9 +86,7 @@
             color: #4f46e5;
             font-weight: bold;
         }
-        .upload-box input {
-            display: none;
-        }
+        .upload-box input { display: none; }
 
         table {
             width: 100%;
@@ -109,17 +103,6 @@
             color: white;
             font-weight: bold;
             font-size: 10pt;
-            position: relative;
-        }
-        th .del-col-btn {
-            background: #ef4444;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            padding: 2px 5px;
-            font-size: 8pt;
-            cursor: pointer;
-            margin-right: 5px;
         }
         td input {
             width: 95%;
@@ -158,10 +141,10 @@
             <p>نظام إدارة الفواتير والأسعار والأعمدة المخصصة</p>
         </div>
 
-        <!-- صندوق رفع ملف الإكسل المدمج -->
+        <!-- صندوق رفع ملف الإكسل -->
         <div class="upload-box">
             <label for="excelFile">
-                📁 <strong>اضغط هنا لرفع ملف إكسل (.xlsx) وتحديث المنتجات فوراً</strong>
+                📁 <strong>اضغط هنا لرفع ملف إكسل (.xlsx) وتحديث المنتجات والأعمدة فوراً</strong>
             </label>
             <input type="file" id="excelFile" accept=".xlsx, .xls, .csv" onchange="handleExcelUpload(event)">
         </div>
@@ -172,18 +155,15 @@
             <button class="btn btn-purple" onclick="addColumn()">➕ إضافة عمود</button>
             <button class="btn btn-info" onclick="exportToExcel()">📥 تصدير لإكسل</button>
             <button class="btn" onclick="window.print()" style="background-color: #1f2937;">🖨️ طباعة</button>
+            <button class="btn btn-danger" onclick="resetTable()" title="مسح التخزين المؤقت واستعادة الأعمدة الجديدة">🔄 إعادة ضبط الجدول</button>
         </div>
 
         <div style="overflow-x: auto;">
             <table id="invoiceTable">
                 <thead>
-                    <tr id="tableHeaderRow">
-                        <!-- سيتم بناء أعمدة الجدول ديناميكياً -->
-                    </tr>
+                    <tr id="tableHeaderRow"></tr>
                 </thead>
-                <tbody id="tableBody">
-                    <!-- سيتم تعبئة البيانات هنا تلقائياً -->
-                </tbody>
+                <tbody id="tableBody"></tbody>
             </table>
         </div>
 
@@ -194,8 +174,8 @@
     </div>
 
     <script>
-        // الأعمدة الأساسية المحدثة
-        let invoiceColumns = JSON.parse(localStorage.getItem('bim_invoice_cols')) || [
+        // الأعمدة الأساسية المطلوبة بالترتيب الصحيح تماماً
+        let invoiceColumns = [
             "اسم المنتج", 
             "عدد قطع داخل الطرد", 
             "شراء الطرد", 
@@ -204,54 +184,71 @@
             "سعر البيع"
         ];
 
-        let invoiceData = JSON.parse(localStorage.getItem('bim_invoice_data')) || [
+        let invoiceData = [
             { id: 1, name: "معارم معطرة صغيرة سائل", pcs: 2, buyBundle: 520.00, buyUnit: 260.00, sellBundle: 600.00, sellUnit: 300.00, extra: {} },
             { id: 2, name: "شامبو هيرابي 3 لتر 4 قطع", pcs: 4, buyBundle: 1290.00, buyUnit: 322.50, sellBundle: 1480.00, sellUnit: 370.00, extra: {} }
         ];
 
+        // محاولة جلب البيانات بترميز v3 لتجنب التعارض مع الذاكرة القديمة
+        try {
+            let savedCols = JSON.parse(localStorage.getItem('bim_invoice_cols_v3'));
+            let savedData = JSON.parse(localStorage.getItem('bim_invoice_data_v3'));
+            if(savedCols && savedCols.length >= 6) invoiceColumns = savedCols;
+            if(savedData && savedData.length > 0) invoiceData = savedData;
+        } catch(e) {}
+
         function saveToStorage() {
-            localStorage.setItem('bim_invoice_data', JSON.stringify(invoiceData));
-            localStorage.setItem('bim_invoice_cols', JSON.stringify(invoiceColumns));
+            localStorage.setItem('bim_invoice_data_v3', JSON.stringify(invoiceData));
+            localStorage.setItem('bim_invoice_cols_v3', JSON.stringify(invoiceColumns));
+        }
+
+        function resetTable() {
+            if(confirm("هل تريد حقاً إعادة ضبط الجدول ومسح البيانات المؤقتة؟")) {
+                localStorage.removeItem('bim_invoice_cols_v3');
+                localStorage.removeItem('bim_invoice_data_v3');
+                location.reload();
+            }
         }
 
         function renderTable(dataToRender) {
             let headerRow = document.getElementById('tableHeaderRow');
             let tbody = document.getElementById('tableBody');
             
-            // بناء الهيدر
+            // بناء رأس الجدول
             let headerHTML = `<th style="width: 4%;">الرقم</th>`;
             invoiceColumns.forEach((colName, colIdx) => {
-                let delBtn = colIdx >= 6 ? `<button class="del-col-btn" onclick="deleteColumn(${colIdx})" title="حذف العمود">×</button>` : '';
+                let delBtn = colIdx >= 6 ? `<button class="del-col-btn" onclick="deleteColumn(${colIdx})" style="background: #ef4444; color: white; border: none; border-radius: 3px; padding: 1px 4px; font-size: 8pt; cursor: pointer; margin-right: 5px;">×</button>` : '';
                 headerHTML += `<th>${colName} ${delBtn}</th>`;
             });
             headerHTML += `<th style="width: 8%;" class="action-col">إجراء</th>`;
             headerRow.innerHTML = headerHTML;
 
-            // بناء المحتوى
+            // بناء صفوف الجدول بالترتيب المطابق للأعمدة السبعة
             tbody.innerHTML = '';
             dataToRender.forEach((item, index) => {
                 let tr = document.createElement('tr');
                 let rowHTML = `<td>${index + 1}</td>`;
                 
-                invoiceColumns.forEach((col, cIdx) => {
-                    if (cIdx === 0) {
-                        rowHTML += `<td><input type="text" value="${item.name || ''}" onchange="updateData(${item.id}, 'name', this.value)"></td>`;
-                    } else if (cIdx === 1) {
-                        rowHTML += `<td><input type="number" value="${item.pcs !== undefined ? item.pcs : 1}" oninput="updateData(${item.id}, 'pcs', this.value)"></td>`;
-                    } else if (cIdx === 2) {
-                        rowHTML += `<td><input type="number" step="0.01" value="${item.buyBundle !== undefined ? item.buyBundle : 0}" oninput="updateData(${item.id}, 'buyBundle', this.value)"></td>`;
-                    } else if (cIdx === 3) {
-                        rowHTML += `<td><input type="number" step="0.01" value="${item.buyUnit !== undefined ? item.buyUnit : 0}" oninput="updateData(${item.id}, 'buyUnit', this.value)"></td>`;
-                    } else if (cIdx === 4) {
-                        rowHTML += `<td><input type="number" step="0.01" value="${item.sellBundle !== undefined ? item.sellBundle : 0}" oninput="updateData(${item.id}, 'sellBundle', this.value)"></td>`;
-                    } else if (cIdx === 5) {
-                        rowHTML += `<td><input type="number" step="0.01" value="${item.sellUnit !== undefined ? item.sellUnit : 0}" oninput="updateData(${item.id}, 'sellUnit', this.value)"></td>`;
-                    } else {
-                        if(!item.extra) item.extra = {};
-                        let val = item.extra[col] !== undefined ? item.extra[col] : '';
-                        rowHTML += `<td><input type="text" value="${val}" onchange="updateExtraData(${item.id}, '${col}', this.value)"></td>`;
-                    }
-                });
+                // 1. اسم المنتج
+                rowHTML += `<td><input type="text" value="${item.name || ''}" onchange="updateData(${item.id}, 'name', this.value)"></td>`;
+                // 2. عدد قطع داخل الطرد
+                rowHTML += `<td><input type="number" value="${item.pcs !== undefined ? item.pcs : 1}" oninput="updateData(${item.id}, 'pcs', this.value)"></td>`;
+                // 3. شراء الطرد
+                rowHTML += `<td><input type="number" step="0.01" value="${item.buyBundle !== undefined ? item.buyBundle : 0}" oninput="updateData(${item.id}, 'buyBundle', this.value)"></td>`;
+                // 4. سعر الشراء
+                rowHTML += `<td><input type="number" step="0.01" value="${item.buyUnit !== undefined ? item.buyUnit : 0}" oninput="updateData(${item.id}, 'buyUnit', this.value)"></td>`;
+                // 5. بيع الطرد
+                rowHTML += `<td><input type="number" step="0.01" value="${item.sellBundle !== undefined ? item.sellBundle : 0}" oninput="updateData(${item.id}, 'sellBundle', this.value)"></td>`;
+                // 6. سعر البيع
+                rowHTML += `<td><input type="number" step="0.01" value="${item.sellUnit !== undefined ? item.sellUnit : 0}" oninput="updateData(${item.id}, 'sellUnit', this.value)"></td>`;
+
+                // الأعمدة الإضافية إن وجدت
+                for(let c = 6; c < invoiceColumns.length; c++) {
+                    let col = invoiceColumns[c];
+                    if(!item.extra) item.extra = {};
+                    let val = item.extra[col] !== undefined ? item.extra[col] : '';
+                    rowHTML += `<td><input type="text" value="${val}" onchange="updateExtraData(${item.id}, '${col}', this.value)"></td>`;
+                }
 
                 rowHTML += `<td class="action-col"><button class="btn btn-danger" style="padding: 3px 6px; font-size: 10px;" onclick="deleteRow(${item.id})">حذف</button></td>`;
                 tr.innerHTML = rowHTML;
@@ -297,12 +294,10 @@
         function addColumn() {
             let colName = prompt("أدخل اسم العمود الجديد:");
             if (!colName || colName.trim() === "") return;
-            
             if (invoiceColumns.includes(colName.trim())) {
                 alert("هذا العمود موجود مسبقاً!");
                 return;
             }
-
             invoiceColumns.push(colName.trim());
             saveToStorage();
             renderTable(invoiceData);
@@ -310,12 +305,9 @@
 
         function deleteColumn(colIdx) {
             if (colIdx < 6) return;
-            let colName = invoiceColumns[colIdx];
-            if (confirm(`هل أنت متأكد من حذف العمود "${colName}"؟`)) {
-                invoiceColumns.splice(colIdx, 1);
-                saveToStorage();
-                renderTable(invoiceData);
-            }
+            invoiceColumns.splice(colIdx, 1);
+            saveToStorage();
+            renderTable(invoiceData);
         }
 
         function handleExcelUpload(event) {
@@ -327,8 +319,7 @@
                 try {
                     let data = new Uint8Array(e.target.result);
                     let workbook = XLSX.read(data, { type: 'array' });
-                    let firstSheetName = workbook.SheetNames[0];
-                    let worksheet = workbook.Sheets[firstSheetName];
+                    let worksheet = workbook.Sheets[workbook.SheetNames[0]];
                     let jsonSheet = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
 
                     if (jsonSheet.length > 0) {
@@ -364,7 +355,7 @@
                             invoiceData = invoiceData.concat(newItems);
                             saveToStorage();
                             renderTable(invoiceData);
-                            alert("تم رفع الملف وتحديث المنتجات والأعمدة بنجاح! 🎉");
+                            alert("تم رفع الملف وتحديث البيانات بنجاح! 🎉");
                         }
                     }
                 } catch (err) {
@@ -375,8 +366,7 @@
         }
 
         function addRow() {
-            let newId = Date.now();
-            let newItem = { id: newId, name: "منتج جديد", pcs: 1, buyBundle: 0, buyUnit: 0, sellBundle: 0, sellUnit: 0, extra: {} };
+            let newItem = { id: Date.now(), name: "منتج جديد", pcs: 1, buyBundle: 0, buyUnit: 0, sellBundle: 0, sellUnit: 0, extra: {} };
             invoiceColumns.slice(6).forEach(col => { newItem.extra[col] = ''; });
             invoiceData.push(newItem);
             saveToStorage();
@@ -390,10 +380,7 @@
         }
 
         function exportToExcel() {
-            let worksheetData = [[]];
-            invoiceColumns.forEach(col => worksheetData[0].push(col));
-
-            invoiceData.exports = invoiceData; // temp
+            let worksheetData = [invoiceColumns];
             invoiceData.forEach(item => {
                 let row = [item.name, item.pcs, item.buyBundle, item.buyUnit, item.sellBundle, item.sellUnit];
                 invoiceColumns.slice(6).forEach(col => {
