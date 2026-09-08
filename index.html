@@ -2,7 +2,7 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>فاتورة بيم الرضوان - بدون المجموع</title>
+    <title>فاتورة بيم الرضوان - استيراد وتحديث البيانات</title>
     <style>
         @page {
             size: A4;
@@ -47,13 +47,13 @@
             margin-bottom: 15px;
             gap: 10px;
         }
-        .controls input, .controls button {
+        .controls input[type="text"], .controls label.btn-upload {
             padding: 8px 12px;
             border: 1px solid #d1d5db;
             border-radius: 6px;
             font-size: 10.5pt;
         }
-        .controls input {
+        .controls input[type="text"] {
             flex: 1;
             min-width: 200px;
         }
@@ -63,12 +63,23 @@
             border: none;
             cursor: pointer;
             font-weight: bold;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 10.5pt;
         }
         .btn:hover {
             opacity: 0.9;
         }
         .btn-success { background-color: #059669; }
         .btn-danger { background-color: #dc2626; }
+        .btn-upload {
+            background-color: #d97706;
+            color: white;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            cursor: pointer;
+        }
         
         table {
             width: 100%;
@@ -145,14 +156,17 @@
     <div class="container">
         <div class="header">
             <h1>سوبر ماركت بيم الرضوان</h1>
-            <p>تقرير الفاتورة المطور - بدون سطر المجموع الكلي</p>
+            <p>نظام إدارة الفواتير والمخزون المطور</p>
         </div>
 
         <div class="controls">
             <input type="text" id="searchInput" placeholder="ابحث عن منتج بالاسم..." oninput="filterTable()">
-            <button class="btn btn-success" onclick="addRow()">➕ إضافة صف جديد</button>
-            <button class="btn" onclick="addColumn()">➕ إضافة عمود جديد</button>
-            <button class="btn" onclick="window.print()" style="background-color: #1f2937;">🖨️ طباعة الورقة</button>
+            <label class="btn btn-upload">
+                📂 رفع ملف بيانات <input type="file" id="csvFileInput" accept=".csv, .txt" style="display: none;" onchange="handleFileUpload(event)">
+            </label>
+            <button class="btn btn-success" onclick="addRow()">➕ إضافة صف</button>
+            <button class="btn" onclick="addColumn()">➕ إضافة عمود</button>
+            <button class="btn" onclick="window.print()" style="background-color: #1f2937;">🖨️ طباعة</button>
         </div>
 
         <div style="overflow-x: auto;">
@@ -174,7 +188,7 @@
         </div>
 
         <div class="footer">
-            <div>تاريخ الإصدار: 2026-09-09</div>
+            <div>تاريخ الإصدار: 2026-08-19</div>
             <div>تم الاستخراج والتنظيم بواسطة نظام بيم الرضوان</div>
         </div>
     </div>
@@ -182,22 +196,32 @@
     <script>
         let dynamicColumns = [];
 
+        // المنتجات الحالية من آخر فاتورة
         let invoiceData = [
-            { id: 1, name: "رز بيليك بر حبة طويلة 900 غرام", qty: 20, bundlePrice: 1135.00, extraValues: {} },
-            { id: 2, name: "رز اسكندر 900 غرام", qty: 20, bundlePrice: 1510.00, extraValues: {} },
-            { id: 3, name: "ملوخية مصرية 12 قطعة وزن 350 غرام", qty: 12, bundlePrice: 1300.00, extraValues: {} },
-            { id: 4, name: "منتج متنوع / طرد", qty: 10, bundlePrice: 100.00, extraValues: {} },
-            { id: 5, name: "مطبورة صلصة", qty: 72, bundlePrice: 100.00, extraValues: {} },
-            { id: 6, name: "معجون محل 7 كغ", qty: 5, bundlePrice: 430.00, extraValues: {} },
-            { id: 7, name: "محمود 3*1 12 قطعة mahnut", qty: 12, bundlePrice: 1900.00, extraValues: {} },
-            { id: 8, name: "طون التونسنا 24 قطعة", qty: 24, bundlePrice: 1375.00, extraValues: {} },
-            { id: 9, name: "رز احمدي 900 غرام", qty: 20, bundlePrice: 1800.00, extraValues: {} },
-            { id: 10, name: "كاسات شاي تركية 12 قطعة", qty: 12, bundlePrice: 435.00, extraValues: {} },
-            { id: 11, name: "سنة بيتزا 4.5 لتر 4 قطع", qty: 4, bundlePrice: 1800.00, extraValues: {} },
-            { id: 12, name: "قلب جوز 5 كغ", qty: 5, bundlePrice: 380.00, extraValues: {} },
-            { id: 13, name: "معجون محل 1200 غرام عدد 4 قطع", qty: 4, bundlePrice: 380.00, extraValues: {} },
-            { id: 14, name: "فول علب 200 غرام 24 قطعة", qty: 24, bundlePrice: 400.00, extraValues: {} },
-            { id: 15, name: "ملح 8 كغ tuz", qty: 30, bundlePrice: 42.00, extraValues: {} }
+            { id: 1, name: "معارم معطرة صغيرة سائل", qty: 2, bundlePrice: 520.00, extraValues: {} },
+            { id: 2, name: "شامبو هيرابي 3 لتر 4 قطع", qty: 2, bundlePrice: 1290.00, extraValues: {} },
+            { id: 3, name: "بلسم هيرابي 3 لتر 4 قطع", qty: 1, bundlePrice: 645.00, extraValues: {} },
+            { id: 4, name: "حامو هيرابي 3 لتر 4 قطع", qty: 1, bundlePrice: 645.00, extraValues: {} },
+            { id: 5, name: "سنة البيرة الحبوب 800 مل 12 قطعة", qty: 1, bundlePrice: 400.00, extraValues: {} },
+            { id: 6, name: "حامو ملتان 15 قطعة", qty: 2, bundlePrice: 1550.00, extraValues: {} },
+            { id: 7, name: "طون التونسنا 24 قطعة", qty: 1, bundlePrice: 1385.00, extraValues: {} },
+            { id: 8, name: "القارة معكرونة، مكرونة، هامرية، هيمبرية 20 قطعة 500 غرام", qty: 1, bundlePrice: 475.00, extraValues: {} },
+            { id: 9, name: "كروصان 24/7 عدد 24 قطعة", qty: 1, bundlePrice: 160.00, extraValues: {} },
+            { id: 10, name: "واصل", qty: 1, bundlePrice: 260.00, extraValues: {} },
+            { id: 11, name: "فتاحاعات دولاب جر 50 قطعة", qty: 1, bundlePrice: 300.00, extraValues: {} },
+            { id: 12, name: "بودرة أطفال علبة هينس 12 قطعة", qty: 1, bundlePrice: 410.00, extraValues: {} },
+            { id: 13, name: "كاتشب 12 قطعة", qty: 1, bundlePrice: 2800.00, extraValues: {} },
+            { id: 14, name: "فاصوليا مقادة 900 غرام 12 قطعة", qty: 1, bundlePrice: 700.00, extraValues: {} },
+            { id: 15, name: "جبنة حمرا 100 قطعة", qty: 1, bundlePrice: 950.00, extraValues: {} },
+            { id: 16, name: "بذور دور 750 غرام 12 قطعة", qty: 1, bundlePrice: 5000.00, extraValues: {} },
+            { id: 17, name: "شاي احمدي 400 غرام 24 قطعة", qty: 24, bundlePrice: 198.75, extraValues: {} },
+            { id: 18, name: "شاي حورجة 400 غرام", qty: 16, bundlePrice: 100.00, extraValues: {} },
+            { id: 19, name: "مربى بور 400 غرام", qty: 2, bundlePrice: 4150.00, extraValues: {} },
+            { id: 20, name: "شاي نادي احمدي 900 غرام", qty: 1, bundlePrice: 100.00, extraValues: {} },
+            { id: 21, name: "ميم مكعب أصلي 6 قطع", qty: 1, bundlePrice: 480.00, extraValues: {} },
+            { id: 22, name: "شاي هاي بيست 900 غرام 20 قطعة", qty: 1, bundlePrice: 1875.00, extraValues: {} },
+            { id: 23, name: "حمص جيزل 12 غرام 900 قطعة", qty: 1, bundlePrice: 130.00, extraValues: {} },
+            { id: 24, name: "طون الهيل 48 قطعة", qty: 1, bundlePrice: 30.00, extraValues: {} }
         ];
 
         function renderTable(dataToRender) {
@@ -240,6 +264,42 @@
                 tr.innerHTML = rowHTML;
                 tbody.appendChild(tr);
             });
+        }
+
+        // ميزة قراءة ملفات CSV المرفوعة من الجهاز وتحديث الجدول مباشرة
+        function handleFileUpload(event) {
+            let file = event.target.files[0];
+            if (!file) return;
+
+            let reader = new FileReader();
+            reader.onload = function(e) {
+                let text = e.target.result;
+                let lines = text.split('\n');
+                let newItems = [];
+
+                lines.forEach((line, index) => {
+                    if (!line.trim()) return;
+                    let parts = line.split(',');
+                    if (parts.length >= 3) {
+                        newItems.push({
+                            id: index + 1,
+                            name: parts[0].trim(),
+                            qty: parseFloat(parts[1]) || 1,
+                            bundlePrice: parseFloat(parts[2]) || 0,
+                            extraValues: {}
+                        });
+                    }
+                });
+
+                if (newItems.length > 0) {
+                    invoiceData = newItems;
+                    renderTable(invoiceData);
+                    alert("تم رفع وتحديث البيانات بنجاح!");
+                } else {
+                    alert("لم يتم العثور على بيانات صالحة في الملف. التأكد من تنسيق الملف (اسم,الكمية,السعر).");
+                }
+            };
+            reader.readAsText(file);
         }
 
         function updateData(id, field, value) {
@@ -285,7 +345,7 @@
         }
 
         function addColumn() {
-            let colName = prompt("أدخل اسم العمود الجديد (مثال: الملاحظات، المورد، الموقع):", "عمود جديد");
+            let colName = prompt("أدخل اسم العمود الجديد:", "ملاحظات");
             if (colName && colName.trim() !== "") {
                 dynamicColumns.push(colName.trim());
                 renderTable(invoiceData);
@@ -299,7 +359,7 @@
         }
 
         function deleteColumn(colIdx) {
-            if (confirm("هل أنت متأكد من حذف هذا العمود بكل بياناته؟")) {
+            if (confirm("هل أنت متأكد من حذف هذا العمود؟")) {
                 dynamicColumns.splice(colIdx, 1);
                 invoiceData.forEach(item => {
                     if (item.extraValues) {
