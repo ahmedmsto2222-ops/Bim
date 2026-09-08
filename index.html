@@ -2,7 +2,9 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>فاتورة بيم الرضوان - استيراد وتحديث البيانات</title>
+    <title>فاتورة بيم الرضوان - قراءة ملفات الإكسل مباشرة</title>
+    <!-- استدعاء مكتبة قراءة ملفات الإكسل من الإنترنت لتسهيل الرفع -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         @page {
             size: A4;
@@ -156,13 +158,13 @@
     <div class="container">
         <div class="header">
             <h1>سوبر ماركت بيم الرضوان</h1>
-            <p>نظام إدارة الفواتير والمخزون المطور</p>
+            <p>نظام قراءة ملفات الإكسل و إدارة الفواتير</p>
         </div>
 
         <div class="controls">
             <input type="text" id="searchInput" placeholder="ابحث عن منتج بالاسم..." oninput="filterTable()">
             <label class="btn btn-upload">
-                📂 رفع ملف بيانات <input type="file" id="csvFileInput" accept=".csv, .txt" style="display: none;" onchange="handleFileUpload(event)">
+                📂 رفع ملف إكسل <input type="file" id="excelFileInput" accept=".xlsx, .xls" style="display: none;" onchange="handleExcelUpload(event)">
             </label>
             <button class="btn btn-success" onclick="addRow()">➕ إضافة صف</button>
             <button class="btn" onclick="addColumn()">➕ إضافة عمود</button>
@@ -188,7 +190,7 @@
         </div>
 
         <div class="footer">
-            <div>تاريخ الإصدار: 2026-08-19</div>
+            <div>تاريخ الإصدار: 2026-09-09</div>
             <div>تم الاستخراج والتنظيم بواسطة نظام بيم الرضوان</div>
         </div>
     </div>
@@ -196,7 +198,6 @@
     <script>
         let dynamicColumns = [];
 
-        // المنتجات الحالية من آخر فاتورة
         let invoiceData = [
             { id: 1, name: "معارم معطرة صغيرة سائل", qty: 2, bundlePrice: 520.00, extraValues: {} },
             { id: 2, name: "شامبو هيرابي 3 لتر 4 قطع", qty: 2, bundlePrice: 1290.00, extraValues: {} },
@@ -266,40 +267,49 @@
             });
         }
 
-        // ميزة قراءة ملفات CSV المرفوعة من الجهاز وتحديث الجدول مباشرة
-        function handleFileUpload(event) {
+        // قراءة ملف الإكسل الحقيقي (.xlsx / .xls) عبر المتصفح مباشرة
+        function handleExcelUpload(event) {
             let file = event.target.files[0];
             if (!file) return;
 
             let reader = new FileReader();
             reader.onload = function(e) {
-                let text = e.target.result;
-                let lines = text.split('\n');
-                let newItems = [];
+                try {
+                    let data = new Uint8Array(e.target.result);
+                    let workbook = XLSX.read(data, { type: 'array' });
+                    let firstSheetName = workbook.SheetNames[0];
+                    let worksheet = workbook.Sheets[firstSheetName];
+                    let jsonRows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
 
-                lines.forEach((line, index) => {
-                    if (!line.trim()) return;
-                    let parts = line.split(',');
-                    if (parts.length >= 3) {
-                        newItems.push({
-                            id: index + 1,
-                            name: parts[0].trim(),
-                            qty: parseFloat(parts[1]) || 1,
-                            bundlePrice: parseFloat(parts[2]) || 0,
-                            extraValues: {}
-                        });
+                    let newItems = [];
+                    let idCounter = 1;
+
+                    // تخطي صف العناوين البدء من السطر الثاني (index 1)
+                    for (let i = 1; i < jsonRows.length; i++) {
+                        let row = jsonRows[i];
+                        if (row && row.length >= 3 && row[0]) {
+                            newItems.push({
+                                id: idCounter++,
+                                name: String(row[0]).trim(),
+                                qty: parseFloat(row[1]) || 1,
+                                bundlePrice: parseFloat(row[2]) || 0,
+                                extraValues: {}
+                            });
+                        }
                     }
-                });
 
-                if (newItems.length > 0) {
-                    invoiceData = newItems;
-                    renderTable(invoiceData);
-                    alert("تم رفع وتحديث البيانات بنجاح!");
-                } else {
-                    alert("لم يتم العثور على بيانات صالحة في الملف. التأكد من تنسيق الملف (اسم,الكمية,السعر).");
+                    if (newItems.length > 0) {
+                        invoiceData = newItems;
+                        renderTable(invoiceData);
+                        alert("تم رفع وتحديث بيانات الإكسل بنجاح!");
+                    } else {
+                        alert("لم يتم العثور على بيانات كافية. تأكد أن الأعمدة مرتبة هكذا: (اسم المنتج في العمود الأول، الكمية في الثاني، السعر في الثالث).");
+                    }
+                } catch (error) {
+                    alert("حدث خطأ أثناء قراءة ملف الإكسل. تأكد من صحة الملف.");
                 }
             };
-            reader.readAsText(file);
+            reader.readAsArrayBuffer(file);
         }
 
         function updateData(id, field, value) {
