@@ -117,7 +117,7 @@
     <div class="container">
         <div class="header">
             <h1>سوبر ماركت بيم الرضوان</h1>
-            <p>قائمة المنتجات الجديدة مع 3 أعمدة فارغة متكررة</p>
+            <p>قائمة المنتجات مع الترتيب التسلسلي الصحيح</p>
         </div>
 
         <div class="controls">
@@ -188,7 +188,7 @@
             "زيت لتر",
             "زيت لترين",
             "زيت لتر وتلت ارباع",
-            "سمنة ة خير ٤ونص لتر",
+            "سمنة خير ٤ونص لتر",
             "سمنة خير لتر و ٧٥",
             "سمنة خير لتر",
             "سمنة بيزا ٤ونص",
@@ -362,8 +362,9 @@
 
             let leftHTML = '';
             leftProducts.forEach((prod, idx) => {
+                let serialNum = idx + 1; // الترتيب التسلسلي يبدأ من 1 للجدول الأيمن
                 leftHTML += `<tr>
-                    <td class="col-num">${idx + 1}</td>
+                    <td class="col-num">${serialNum}</td>
                     <td class="col-name">${prod}</td>
                     <td class="col-empty"><input type="text" placeholder=""></td>
                     <td class="col-empty"><input type="text" placeholder=""></td>
@@ -374,9 +375,9 @@
 
             let rightHTML = '';
             rightProducts.forEach((prod, idx) => {
-                let actualIndex = midPoint + idx + 1;
+                let serialNum = midPoint + idx + 1; // الترتيب التسلسلي يكمل مباشرة في الجدول الأيسر
                 rightHTML += `<tr>
-                    <td class="col-num">${actualIndex}</td>
+                    <td class="col-num">${serialNum}</td>
                     <td class="col-name">${prod}</td>
                     <td class="col-empty"><input type="text" placeholder=""></td>
                     <td class="col-empty"><input type="text" placeholder=""></td>
