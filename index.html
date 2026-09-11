@@ -2,14 +2,7 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>سوبر ماركت بيم الرضوان - إدارة الفواتير والمخزون</title>
-    <!-- مكتبة قراءة ملفات الإكسل برمجياً -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <!-- مكتبة قراءة ملفات PDF محلياً -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-    <script>
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-    </script>
+    <title>سوبر ماركت بيم الرضوان - قائمة المنتجات والفراغات المزدوجة</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -20,7 +13,7 @@
             font-size: 11pt;
         }
         .container {
-            max-width: 1350px;
+            max-width: 1450px;
             margin: 0 auto;
             background: #ffffff;
             padding: 20px;
@@ -45,19 +38,10 @@
         }
         .controls {
             display: flex;
-            flex-wrap: wrap;
             justify-content: space-between;
             margin-bottom: 15px;
             gap: 10px;
             align-items: center;
-        }
-        .controls input[type="text"] {
-            padding: 8px 12px;
-            border: 1px solid #d1d5db;
-            border-radius: 6px;
-            font-size: 10.5pt;
-            flex: 1;
-            min-width: 180px;
         }
         .btn {
             background-color: #4f46e5;
@@ -65,49 +49,28 @@
             border: none;
             cursor: pointer;
             font-weight: bold;
-            padding: 8px 12px;
+            padding: 8px 15px;
             border-radius: 6px;
             font-size: 10.5pt;
-            display: inline-flex;
-            align-items: center;
-            gap: 5px;
         }
         .btn:hover { opacity: 0.9; }
-        .btn-success { background-color: #059669; }
-        .btn-danger { background-color: #dc2626; }
-        .btn-info { background-color: #0284c7; }
-        .btn-purple { background-color: #7c3aed; }
         
-        .upload-boxes {
+        /* تخطيط الجداول المتجاورة (جنباً إلى جنب في نفس الصفحة) */
+        .tables-wrapper {
             display: flex;
-            gap: 10px;
-            margin-bottom: 15px;
-            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: space-between;
+            overflow-x: auto;
         }
-        .upload-box {
-            background: #eef2ff;
-            border: 2px dashed #4f46e5;
-            padding: 12px;
-            border-radius: 8px;
-            text-align: center;
+        .table-box {
             flex: 1;
-            min-width: 220px;
+            min-width: 48%;
         }
-        .upload-box-pdf {
-            background: #fef2f2;
-            border: 2px dashed #b91c1c;
-        }
-        .upload-box label {
-            cursor: pointer;
-            font-weight: bold;
-        }
-        .upload-box input { display: none; }
-
         table {
             width: 100%;
             border-collapse: collapse;
             margin-top: 10px;
-            table-layout: auto; /* السماح بتوزيع المساحة بمرونة */
+            table-layout: fixed;
         }
         th, td {
             border: 1px solid #d1d5db;
@@ -120,17 +83,11 @@
             font-weight: bold;
             font-size: 10pt;
         }
-        /* تخصيص عمود اسم المنتج ليكون واسعاً ويظهر كل النص بوضوح ومريح للقراءة */
-        .product-name-col {
-            width: 35% !important;
-            text-align: right !important;
-            padding-right: 12px !important;
-        }
-        .product-name-col input {
-            text-align: right !important;
-            width: 100% !important;
-            font-weight: 500;
-        }
+        /* تخصيص أعمدة الجدول */
+        .col-num { width: 8%; background-color: #f9fafb; font-weight: bold; }
+        .col-name { width: 52%; text-align: right !important; padding-right: 12px !important; font-weight: 500; }
+        .col-empty-1 { width: 20%; background-color: #ffffff; }
+        .col-empty-2 { width: 20%; background-color: #ffffff; }
 
         td input {
             width: 95%;
@@ -145,453 +102,154 @@
             outline: 1px solid #4f46e5;
             border-radius: 4px;
         }
-        tr:nth-child(even) { background-color: #f9fafb; }
+        tr:nth-child(even) { background-color: #fcfcfc; }
         .footer {
             margin-top: 20px;
-            display: flex;
-            justify-content: space-between;
+            text-align: center;
             font-size: 10pt;
             color: #6b7280;
-        }
-        #loadingOverlay {
-            display: none;
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.6);
-            z-index: 9999;
-            color: white;
-            font-size: 16pt;
-            text-align: center;
-            padding-top: 20vh;
+            border-top: 1px solid #e5e7eb;
+            padding-top: 10px;
         }
     </style>
 </head>
 <body>
 
-    <div id="loadingOverlay">⏳ جاري قراءة الملف وتحليل محتواه...<br><span id="progressText" style="font-size: 12pt; color: #fbbf24;">يرجى الانتظار...</span></div>
-
     <div class="container">
         <div class="header">
             <h1>سوبر ماركت بيم الرضوان</h1>
-            <p>نظام إدارة الفواتير والمخزون - عرض واسع وواضح لأسماء المنتجات</p>
-        </div>
-
-        <!-- صناديق الرفع -->
-        <div class="upload-boxes">
-            <div class="upload-box">
-                <label for="excelFile">
-                    📁 <strong>رفع ملف إكسل (.xlsx)</strong>
-                </label>
-                <input type="file" id="excelFile" accept=".xlsx, .xls, .csv" onchange="handleExcelUpload(event)">
-            </div>
-            <div class="upload-box upload-box-pdf">
-                <label for="pdfFile" style="color: #b91c1c;">
-                    📄 <strong>رفع ملف PDF (استخراج شامل)</strong>
-                </label>
-                <input type="file" id="pdfFile" accept=".pdf" onchange="handlePdfUpload(event)">
-            </div>
+            <p>قائمة المنتجات مع الأعمدة الفارغة المتكررة جنباً إلى جنب</p>
         </div>
 
         <div class="controls">
-            <input type="text" id="searchInput" placeholder="ابحث عن منتج بالاسم..." oninput="filterTable()">
-            <button class="btn btn-success" onclick="addNewProductPrompt()">➕ إضافة منتج</button>
-            <button class="btn btn-info" style="background-color: #d97706;" onclick="openPasteModal()">📋 إدخال النص يدوياً</button>
-            <button class="btn btn-purple" onclick="addColumn()">➕ إضافة عمود</button>
-            <button class="btn btn-info" onclick="exportToExcel()">📥 تصدير لإكسل</button>
-            <button class="btn" onclick="window.print()" style="background-color: #1f2937;">🖨️ طباعة</button>
+            <div>
+                <span style="font-weight: bold; color: #059669;">الحالة: جاهز للإدخال والطباعة ✅</span>
+            </div>
+            <button class="btn" onclick="window.print()" style="background-color: #1f2937;">🖨️ طباعة الصفحة</button>
         </div>
 
-        <div style="overflow-x: auto;">
-            <table id="invoiceTable">
-                <thead>
-                    <tr id="tableHeaderRow"></tr>
-                </thead>
-                <tbody id="tableBody"></tbody>
-            </table>
+        <!-- حاوية الجداول المتجاورة (جدولان بنفس الصفحة) -->
+        <div class="tables-wrapper">
+            <!-- الجدول الأول (القسم الأيمن) -->
+            <div class="table-box">
+                <table>
+                    <thead>
+                        <tr>
+                            <th class="col-num">رقم</th>
+                            <th class="col-name">اسم المنتج</th>
+                            <th class="col-empty-1"></th>
+                            <th class="col-empty-2"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="leftTableBody">
+                        <!-- يتم تعبئته برمجياً -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- الجدول الثاني (القسم الأيسر - تكرار بنفس الفكرة) -->
+            <div class="table-box">
+                <table>
+                    <thead>
+                        <tr>
+                            <th class="col-num">رقم</th>
+                            <th class="col-name">اسم المنتج</th>
+                            <th class="col-empty-1"></th>
+                            <th class="col-empty-2"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="rightTableBody">
+                        <!-- يتم تعبئته برمجياً -->
+                    </tbody>
+                </table>
+            </div>
         </div>
 
         <div class="footer">
-            <div>حالة النظام: <span style="color: #059669; font-weight: bold;">جاهز ✅</span></div>
-            <div>بيم الرضوان - 2026</div>
+            بيم الرضوان - 2026 جميع الحقوق محفوظة
         </div>
     </div>
 
     <script>
-        let invoiceColumns = [
-            "اسم المنتج", 
-            "عدد القطع داخل الطرد", 
-            "شراء الطرد", 
-            "بيع الطرد", 
-            "شراء القطعة", 
-            "بيع القطعة"
+        const productsList = [
+            "زيت بيزجا 1.800 لتر 6 قطع Bizce yağ",
+            "سمنة فيتا 2 لتر 6 قطع vita margarin",
+            "سمنة 111 سطل 4 لتر 4 قطع",
+            "رز أوريجنال 900 غرام 20 قطعة",
+            "رز مكسر مغلف 900 غرام 12اد kırık pirinç",
+            "طون التونسا 24 قطعة",
+            "دبس رمان اكلا بورجيك 12 قطعة",
+            "كاتشب 12 قطعة",
+            "ملح طعام 750 غرام 30 قطعة",
+            "لوبيا معكرونة + شعيرية 500 غرام",
+            "انقرة معكرونة، أشكال، شعيرية 20ad",
+            "سمنة الخير 4.5 لتر 4 قطع",
+            "سمنة ايفيت 5 لتر 4 قطع",
+            "رز بيك بن حبة طويلة 900 غرام 20قطعة",
+            "رز كبسة 900 غرام 12 قطعة",
+            "طون نايس 48 قطعة",
+            "سردين صيني 50 قطعة",
+            "مايونيز 12 قطعة Mayonez",
+            "برغل مغلف 900 غرام 12 قطعة",
+            "ملح 8 كغ tuz 8kg",
+            "انقرة معكرونة طويلة 20ad",
+            "خل التفاح اسما 750 مل 12 قطعة",
+            "ماجي كف هارموني 60 قطعة",
+            "محارم اطلس نص كيلو 10 قطع",
+            "حفاضات غيرمو 5 قطع gizmo bez",
+            "منة خضرا خارطة 20 قطعة",
+            "فراش اسنان ديناميك 12 قطعة",
+            "جاك كبيرة 24 قطعة Jak wresttir",
+            "حليب دانيتو نكهات 27 قطعة",
+            "جاست باور النمر 1 لتر 12 قطعة",
+            "عصير التونسا ظرف 24 قطعة",
+            "بلسم هوبي صغيرة 12 قطعة",
+            "شامبو الهيدور 6 قطع",
+            "ملوخية مصرية 12 قطعة 350 غرام",
+            "دبس عنب 1350غ 12ق",
+            "فانيليا و خميرة ريم 6 قطعة",
+            "محارم معطرة سيل سيل 12adet",
+            "حفاضات شوكا 5 قطع suka bez",
+            "محارم معطرة جنى 90 منديل",
+            "بخاخ حشرات كيلتوكس 12 قطعة",
+            "دلة هال 12 قطعة",
+            "ماء مشكل",
+            "جاست باور النمر كبيرة 24 قطعة"
         ];
 
-        let invoiceData = [
-            { id: 1, name: "شاي الروحة 25 ظرف 48 قطعة", pcs: 48, buyBundle: 1750.00, sellBundle: 2100.00, buyUnit: 36.46, sellUnit: 43.75, extra: {} },
-            { id: 2, name: "رز احمدي 900 غرام '20' قطعة العرض : شاي احمد", pcs: 20, buyBundle: 1800.00, sellBundle: 2160.00, buyUnit: 90.00, sellUnit: 108.00, extra: {} }
-        ];
-
-        try {
-            let savedCols = JSON.parse(localStorage.getItem('bim_invoice_cols_v12'));
-            let savedData = JSON.parse(localStorage.getItem('bim_invoice_data_v12'));
-            if(savedCols && savedCols.length >= 6) invoiceColumns = savedCols;
-            if(savedData && savedData.length > 0) invoiceData = savedData;
-        } catch(e) {}
-
-        function saveToStorage() {
-            localStorage.setItem('bim_invoice_data_v12', JSON.stringify(invoiceData));
-            localStorage.setItem('bim_invoice_cols_v12', JSON.stringify(invoiceColumns));
-        }
-
-        function renderTable(dataToRender) {
-            let headerRow = document.getElementById('tableHeaderRow');
-            let tbody = document.getElementById('tableBody');
+        function renderDualTables() {
+            let leftBody = document.getElementById('leftTableBody');
+            let rightBody = document.getElementById('rightTableBody');
             
-            let headerHTML = `<th style="width: 5%;">الرقم</th>`;
-            invoiceColumns.forEach((colName, colIdx) => {
-                let delBtn = colIdx >= 6 ? `<button class="del-col-btn" onclick="deleteColumn(${colIdx})" style="background: #ef4444; color: white; border: none; border-radius: 3px; padding: 1px 4px; font-size: 8pt; cursor: pointer; margin-right: 5px;">×</button>` : '';
-                let thClass = colIdx === 0 ? ` class="product-name-col"` : '';
-                headerHTML += `<th${thClass}>${colName} ${delBtn}</th>`;
+            let midPoint = Math.ceil(productsList.length / 2);
+            let leftProducts = productsList.slice(0, midPoint);
+            let rightProducts = productsList.slice(midPoint);
+
+            let leftHTML = '';
+            leftProducts.forEach((prod, idx) => {
+                leftHTML += `<tr>
+                    <td class="col-num">${idx + 1}</td>
+                    <td class="col-name">${prod}</td>
+                    <td class="col-empty-1"><input type="text" placeholder=""></td>
+                    <td class="col-empty-2"><input type="text" placeholder=""></td>
+                </tr>`;
             });
-            headerHTML += `<th style="width: 7%;">إجراء</th>`;
-            headerRow.innerHTML = headerHTML;
+            leftBody.innerHTML = leftHTML;
 
-            tbody.innerHTML = '';
-            dataToRender.forEach((item, index) => {
-                let tr = document.createElement('tr');
-                let rowHTML = `<td>${index + 1}</td>`;
-                
-                // تفعيل صنف العرض الواسع لاسم المنتج مع محاذاة لليمين لقراءة مريحة
-                rowHTML += `<td class="product-name-col"><input type="text" value="${item.name || ''}" onchange="updateData(${item.id}, 'name', this.value)"></td>`;
-                rowHTML += `<td><input type="number" id="pcs_${item.id}" value="${item.pcs !== undefined ? item.pcs : 1}" oninput="calculateAndUpdate(${item.id}, 'pcs')"></td>`;
-                rowHTML += `<td><input type="number" step="0.01" id="buyBundle_${item.id}" value="${item.buyBundle !== undefined ? item.buyBundle : 0}" oninput="calculateAndUpdate(${item.id}, 'buyBundle')"></td>`;
-                rowHTML += `<td><input type="number" step="0.01" id="sellBundle_${item.id}" value="${item.sellBundle !== undefined ? item.sellBundle : 0}" oninput="calculateAndUpdate(${item.id}, 'sellBundle')"></td>`;
-                rowHTML += `<td><input type="number" step="0.01" id="buyUnit_${item.id}" value="${item.buyUnit !== undefined ? item.buyUnit : 0}" oninput="calculateAndUpdate(${item.id}, 'buyUnit')"></td>`;
-                rowHTML += `<td><input type="number" step="0.01" id="sellUnit_${item.id}" value="${item.sellUnit !== undefined ? item.sellUnit : 0}" oninput="calculateAndUpdate(${item.id}, 'sellUnit')"></td>`;
-
-                for(let c = 6; c < invoiceColumns.length; c++) {
-                    let col = invoiceColumns[c];
-                    if(!item.extra) item.extra = {};
-                    let val = item.extra[col] !== undefined ? item.extra[col] : '';
-                    rowHTML += `<td><input type="text" value="${val}" onchange="updateExtraData(${item.id}, '${col}', this.value)"></td>`;
-                }
-
-                rowHTML += `<td><button class="btn btn-danger" style="padding: 3px 6px; font-size: 10px;" onclick="deleteRow(${item.id})">حذف</button></td>`;
-                tr.innerHTML = rowHTML;
-                tbody.appendChild(tr);
+            let rightHTML = '';
+            rightProducts.forEach((prod, idx) => {
+                let actualIndex = midPoint + idx + 1;
+                rightHTML += `<tr>
+                    <td class="col-num">${actualIndex}</td>
+                    <td class="col-name">${prod}</td>
+                    <td class="col-empty-1"><input type="text" placeholder=""></td>
+                    <td class="col-empty-2"><input type="text" placeholder=""></td>
+                </tr>`;
             });
+            rightBody.innerHTML = rightHTML;
         }
 
-        function updateData(id, field, value) {
-            let trimmedVal = value.trim();
-            if (field === 'name') {
-                let existing = invoiceData.find(p => p.name.trim() === trimmedVal && p.id !== id);
-                if (existing) {
-                    alert("⚠️ اسم المنتج موجود مسبقاً في الجدول!");
-                    renderTable(invoiceData);
-                    return;
-                }
-            }
-            let item = invoiceData.find(p => p.id === id);
-            if (!item) return;
-            item[field] = trimmedVal;
-            saveToStorage();
-        }
-
-        function calculateAndUpdate(id, changedField) {
-            let item = invoiceData.find(p => p.id === id);
-            if (!item) return;
-
-            let pcsVal = parseFloat(document.getElementById(`pcs_${id}`).value) || 1;
-            let buyBundleVal = parseFloat(document.getElementById(`buyBundle_${id}`).value) || 0;
-            let buyUnitVal = parseFloat(document.getElementById(`buyUnit_${id}`).value) || 0;
-            let sellBundleVal = parseFloat(document.getElementById(`sellBundle_${id}`).value) || 0;
-            let sellUnitVal = parseFloat(document.getElementById(`sellUnit_${id}`).value) || 0;
-
-            item.pcs = pcsVal;
-
-            if (changedField === 'pcs' || changedField === 'buyBundle') {
-                item.buyBundle = buyBundleVal;
-                if (pcsVal > 0) {
-                    item.buyUnit = +(buyBundleVal / pcsVal).toFixed(2);
-                    document.getElementById(`buyUnit_${id}`).value = item.buyUnit;
-                }
-            } else if (changedField === 'buyUnit') {
-                item.buyUnit = buyUnitVal;
-                if (pcsVal > 0) {
-                    item.buyBundle = +(buyUnitVal * pcsVal).toFixed(2);
-                    document.getElementById(`buyBundle_${id}`).value = item.buyBundle;
-                }
-            } 
-            
-            item.sellBundle = sellBundleVal;
-            item.sellUnit = sellUnitVal;
-
-            saveToStorage();
-        }
-
-        function updateExtraData(id, colName, value) {
-            let item = invoiceData.find(p => p.id === id);
-            if (!item) return;
-            if (!item.extra) item.extra = {};
-            item.extra[colName] = value;
-            saveToStorage();
-        }
-
-        function addColumn() {
-            let colName = prompt("أدخل اسم العمود الجديد:");
-            if (!colName || colName.trim() === "") return;
-            if (invoiceColumns.includes(colName.trim())) {
-                alert("هذا العمود موجود مسبقاً!");
-                return;
-            }
-            invoiceColumns.push(colName.trim());
-            saveToStorage();
-            renderTable(invoiceData);
-        }
-
-        function deleteColumn(colIdx) {
-            if (colIdx < 6) return;
-            invoiceColumns.splice(colIdx, 1);
-            saveToStorage();
-            renderTable(invoiceData);
-        }
-
-        function upsertProduct(prodData) {
-            let cleanName = prodData.name.trim();
-            if (!cleanName) return;
-
-            if (prodData.pcs > 0 && prodData.buyBundle > 0) {
-                prodData.buyUnit = +(prodData.buyBundle / prodData.pcs).toFixed(2);
-            }
-
-            let existingIndex = invoiceData.findIndex(p => p.name.trim() === cleanName);
-            if (existingIndex !== -1) {
-                invoiceData[existingIndex].pcs = prodData.pcs;
-                invoiceData[existingIndex].buyBundle = prodData.buyBundle;
-                invoiceData[existingIndex].sellBundle = prodData.sellBundle;
-                invoiceData[existingIndex].buyUnit = prodData.buyUnit;
-                invoiceData[existingIndex].sellUnit = prodData.sellUnit;
-            } else {
-                invoiceData.push(prodData);
-            }
-            saveToStorage();
-        }
-
-        function addNewProductPrompt() {
-            let name = prompt("أدخل اسم المنتج الجديد:");
-            if (!name || name.trim() === "") return;
-            
-            let newItem = {
-                id: Date.now(),
-                name: name.trim(),
-                pcs: 1,
-                buyBundle: 0,
-                sellBundle: 0,
-                buyUnit: 0,
-                sellUnit: 0,
-                extra: {}
-            };
-            invoiceColumns.slice(6).forEach(col => { newItem.extra[col] = ''; });
-
-            upsertProduct(newItem);
-            renderTable(invoiceData);
-        }
-
-        async function handlePdfUpload(event) {
-            let file = event.target.files[0];
-            if (!file) return;
-
-            let overlay = document.getElementById('loadingOverlay');
-            let progressText = document.getElementById('progressText');
-            overlay.style.display = 'block';
-
-            try {
-                let fileReader = new FileReader();
-                fileReader.onload = async function() {
-                    let typedarray = new Uint8Array(this.result);
-                    let pdf = await pdfjsLib.getDocument(typedarray).promise;
-                    let fullExtractedText = "";
-
-                    for (let i = 1; i <= pdf.numPages; i++) {
-                        progressText.innerText = `جاري قراءة الصفحة ${i} من ${pdf.numPages}...`;
-                        let page = await pdf.getPage(i);
-                        let textContent = await page.getTextContent();
-                        
-                        let items = textContent.items.map(item => ({
-                            str: item.str,
-                            x: item.transform[4],
-                            y: item.transform[5]
-                        }));
-
-                        items.sort((a, b) => Math.abs(b.y - a.y) > 5 ? b.y - a.y : a.x - b.x);
-
-                        let lastY = null;
-                        let lineStr = "";
-                        items.forEach(item => {
-                            if (lastY === null || Math.abs(item.y - lastY) > 6) {
-                                if (lineStr.trim() !== "") fullExtractedText += lineStr + "\n";
-                                lineStr = item.str;
-                                lastY = item.y;
-                            } else {
-                                lineStr += " " + item.str;
-                            }
-                        });
-                        if (lineStr.trim() !== "") fullExtractedText += lineStr + "\n";
-                    }
-
-                    overlay.style.display = 'none';
-                    if (fullExtractedText.trim() !== "") {
-                        processExtractedText(fullExtractedText);
-                    } else {
-                        alert("لم يتم العثور على نصوص واضحة داخل ملف الـ PDF.");
-                    }
-                };
-                fileReader.readAsArrayBuffer(file);
-            } catch (err) {
-                overlay.style.display = 'none';
-                alert("حدث خطأ أثناء قراءة ملف الـ PDF.");
-            }
-        }
-
-        function openPasteModal() {
-            let textInput = prompt("قم بلصق نصوص الفاتورة هنا:");
-            if (textInput && textInput.trim() !== "") {
-                processExtractedText(textInput);
-            }
-        }
-
-        function processExtractedText(text) {
-            let lines = text.split('\n');
-            let addedCount = 0;
-            let updatedCount = 0;
-
-            lines.forEach((line, idx) => {
-                let cleanLine = line.trim();
-                if (cleanLine.length < 3) return;
-
-                let numbers = cleanLine.match(/\d+(\.\d+)?/g);
-                if (numbers && numbers.length >= 1) {
-                    let buyPrice = parseFloat(numbers[numbers.length - 1]) || 0;
-                    let pcsCount = numbers.length >= 2 ? (parseFloat(numbers[numbers.length - 2]) || 1) : 1;
-                    
-                    let productName = cleanLine.replace(/[\d\,\-\.]+/g, ' ').replace(/\s+/g, ' ').trim();
-                    if (productName.length < 2) productName = `منتج فاتورة ${idx + 1}`;
-
-                    let buyUnitCalc = pcsCount > 0 ? +(buyPrice / pcsCount).toFixed(2) : 0;
-
-                    let newItem = {
-                        id: Date.now() + idx,
-                        name: productName,
-                        pcs: (pcsCount > 100 || pcsCount <= 0) ? 1 : pcsCount,
-                        buyBundle: buyPrice,
-                        sellBundle: +(buyPrice * 1.2).toFixed(2),
-                        buyUnit: buyUnitCalc,
-                        sellUnit: +(buyUnitCalc * 1.2).toFixed(2),
-                        extra: {}
-                    };
-
-                    let existing = invoiceData.find(p => p.name.trim() === productName);
-                    if (existing) updatedCount++;
-                    else addedCount++;
-
-                    upsertProduct(newItem);
-                }
-            });
-
-            renderTable(invoiceData);
-            alert(`تم استخراج وفحص المنتجات بنجاح! 📊\n- محدثة: ${updatedCount}\n- جديدة: ${addedCount}`);
-        }
-
-        function handleExcelUpload(event) {
-            let file = event.target.files[0];
-            if (!file) return;
-
-            let reader = new FileReader();
-            reader.onload = function(e) {
-                try {
-                    let data = new Uint8Array(e.target.result);
-                    let workbook = XLSX.read(data, { type: 'array' });
-                    let worksheet = workbook.Sheets[workbook.SheetNames[0]];
-                    let jsonSheet = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-
-                    if (jsonSheet.length > 0) {
-                        let headerRow = jsonSheet[0];
-                        for(let c = 6; c < headerRow.length; c++) {
-                            if(headerRow[c] && !invoiceColumns.includes(headerRow[c])) {
-                                invoiceColumns.push(headerRow[c]);
-                            }
-                        }
-
-                        let updateCount = 0;
-                        let addCount = 0;
-
-                        for (let i = 1; i < jsonSheet.length; i++) {
-                            let row = jsonSheet[i];
-                            if (row && row[0]) {
-                                let productName = String(row[0]).trim();
-                                let existing = invoiceData.find(p => p.name.trim() === productName);
-                                
-                                let newItem = {
-                                    id: existing ? existing.id : (Date.now() + i),
-                                    name: productName,
-                                    pcs: parseFloat(row[1]) || 1,
-                                    buyBundle: parseFloat(row[2]) || 0,
-                                    sellBundle: parseFloat(row[3]) || 0,
-                                    buyUnit: parseFloat(row[4]) || 0,
-                                    sellUnit: parseFloat(row[5]) || 0,
-                                    extra: {}
-                                };
-                                for(let c = 6; c < invoiceColumns.length; c++) {
-                                    newItem.extra[invoiceColumns[c]] = row[c] !== undefined ? row[c] : '';
-                                }
-
-                                if (existing) updateCount++;
-                                else addCount++;
-
-                                upsertProduct(newItem);
-                            }
-                        }
-
-                        renderTable(invoiceData);
-                        alert(`تمت معالجة ملف الإكسل بنجاح وعرض الأسماء كاملة! 🎉\n- محدثة: ${updateCount}\n- جديدة: ${addCount}`);
-                    }
-                } catch (err) {
-                    alert("حدث خطأ أثناء قراءة ملف الإكسل.");
-                }
-            };
-            reader.readAsArrayBuffer(file);
-        }
-
-        function deleteRow(id) {
-            invoiceData = invoiceData.filter(p => p.id !== id);
-            saveToStorage();
-            renderTable(invoiceData);
-        }
-
-        function exportToExcel() {
-            let worksheetData = [invoiceColumns];
-            invoiceData.forEach(item => {
-                let row = [item.name, item.pcs, item.buyBundle, item.sellBundle, item.buyUnit, item.sellUnit];
-                invoiceColumns.slice(6).forEach(col => {
-                    row.push(item.extra && item.extra[col] !== undefined ? item.extra[col] : '');
-                });
-                worksheetData.push(row);
-            });
-
-            let ws = XLSX.utils.aoa_to_sheet(worksheetData);
-            let wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "الفاتورة");
-            XLSX.writeFile(wb, "Bim_Al_Radwan_Export.xlsx");
-        }
-
-        function filterTable() {
-            let query = document.getElementById('searchInput').value.toLowerCase();
-            let filtered = invoiceData.filter(item => item.name.toLowerCase().includes(query));
-            renderTable(filtered);
-        }
-
-        renderTable(invoiceData);
+        renderDualTables();
     </script>
 </body>
 </html>
