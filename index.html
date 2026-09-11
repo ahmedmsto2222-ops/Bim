@@ -55,12 +55,16 @@
         }
         .btn:hover { opacity: 0.9; }
         
-        /* تخطيط الجداول المتجاورة (جنباً إلى جنب في نفس الصفحة) */
-        .tables-wrapper {
+        /* تنسيق الصفحات عند الطباعة والعرض */
+        .page-sheet {
             display: flex;
             gap: 20px;
             justify-content: space-between;
-            overflow-x: auto;
+            margin-bottom: 40px;
+            background: #fff;
+            padding: 15px;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
         }
         .table-box {
             flex: 1;
@@ -69,13 +73,13 @@
         table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 10px;
             table-layout: fixed;
         }
         th, td {
             border: 1px solid #d1d5db;
-            padding: 8px 6px;
+            padding: 6px 4px;
             text-align: center;
+            height: 28px; /* توحيد ارتفاع الصفوف لضمان التناسق */
         }
         th {
             background-color: #4f46e5;
@@ -84,8 +88,8 @@
             font-size: 9.5pt;
         }
         /* تخصيص أعمدة الجدول بدقة */
-        .col-num { width: 7%; background-color: #f9fafb; font-weight: bold; }
-        .col-name { width: 43%; text-align: right !important; padding-right: 10px !important; font-weight: 500; font-size: 9.5pt; }
+        .col-num { width: 7%; background-color: #f9fafb; font-weight: bold; font-size: 9pt; }
+        .col-name { width: 43%; text-align: right !important; padding-right: 8px !important; font-weight: 500; font-size: 9pt; }
         .col-empty { width: 16.66%; background-color: #ffffff; }
 
         td input {
@@ -93,7 +97,7 @@
             border: none;
             background: transparent;
             text-align: center;
-            font-size: 10pt;
+            font-size: 9.5pt;
             font-family: inherit;
         }
         td input:focus {
@@ -102,6 +106,7 @@
             border-radius: 4px;
         }
         tr:nth-child(even) { background-color: #fcfcfc; }
+        
         .footer {
             margin-top: 20px;
             text-align: center;
@@ -110,6 +115,20 @@
             border-top: 1px solid #e5e7eb;
             padding-top: 10px;
         }
+
+        /* إعدادات الطباعة لقطع كل صفحة بشكل صحيح ومستقل */
+        @media print {
+            body { background: none; padding: 0; }
+            .container { box-shadow: none; padding: 0; max-width: 100%; }
+            .controls, .footer, .header { display: none; }
+            .page-sheet {
+                page-break-after: always;
+                break-after: page;
+                border: none;
+                padding: 0;
+                margin: 0;
+            }
+        }
     </style>
 </head>
 <body>
@@ -117,54 +136,18 @@
     <div class="container">
         <div class="header">
             <h1>سوبر ماركت بيم الرضوان</h1>
-            <p>قائمة المنتجات مع الترتيب التسلسلي الصحيح</p>
+            <p>قائمة المنتجات مرتبة (20 سطراً لكل جدول) مع فاصل صفحات تلقائي</p>
         </div>
 
         <div class="controls">
             <div>
-                <span style="font-weight: bold; color: #059669;">الحالة: جاهز للإدخال والطباعة ✅</span>
+                <span style="font-weight: bold; color: #059669;">الحالة: جاهز للطباعة بنظام 20 سطراً لكل جدول ✅</span>
             </div>
             <button class="btn" onclick="window.print()" style="background-color: #1f2937;">🖨️ طباعة الصفحة</button>
         </div>
 
-        <!-- حاوية الجداول المتجاورة (جدولان بنفس الصفحة) -->
-        <div class="tables-wrapper">
-            <!-- الجدول الأول (القسم الأيمن) -->
-            <div class="table-box">
-                <table>
-                    <thead>
-                        <tr>
-                            <th class="col-num">رقم</th>
-                            <th class="col-name">اسم المنتج</th>
-                            <th class="col-empty"></th>
-                            <th class="col-empty"></th>
-                            <th class="col-empty"></th>
-                        </tr>
-                    </thead>
-                    <tbody id="leftTableBody">
-                        <!-- يتم تعبئته برمجياً -->
-                    </tbody>
-                </table>
-            </div>
-
-            <!-- الجدول الثاني (القسم الأيسر) -->
-            <div class="table-box">
-                <table>
-                    <thead>
-                        <tr>
-                            <th class="col-num">رقم</th>
-                            <th class="col-name">اسم المنتج</th>
-                            <th class="col-empty"></th>
-                            <th class="col-empty"></th>
-                            <th class="col-empty"></th>
-                        </tr>
-                    </thead>
-                    <tbody id="rightTableBody">
-                        <!-- يتم تعبئته برمجياً -->
-                    </tbody>
-                </table>
-            </div>
-        </div>
+        <!-- حاوية توليد الصفحات والجداول برمجياً -->
+        <div id="sheetsContainer"></div>
 
         <div class="footer">
             بيم الرضوان - 2026 جميع الحقوق محفوظة
@@ -352,42 +335,93 @@
             "بطاطا مقلي"
         ];
 
-        function renderDualTables() {
-            let leftBody = document.getElementById('leftTableBody');
-            let rightBody = document.getElementById('rightTableBody');
-            
-            let midPoint = Math.ceil(productsList.length / 2);
-            let leftProducts = productsList.slice(0, midPoint);
-            let rightProducts = productsList.slice(midPoint);
+        function generatePagedTables() {
+            const container = document.getElementById('sheetsContainer');
+            container.innerHTML = '';
 
-            let leftHTML = '';
-            leftProducts.forEach((prod, idx) => {
-                let serialNum = idx + 1; // الترتيب التسلسلي يبدأ من 1 للجدول الأيمن
-                leftHTML += `<tr>
-                    <td class="col-num">${serialNum}</td>
-                    <td class="col-name">${prod}</td>
-                    <td class="col-empty"><input type="text" placeholder=""></td>
-                    <td class="col-empty"><input type="text" placeholder=""></td>
-                    <td class="col-empty"><input type="text" placeholder=""></td>
-                </tr>`;
-            });
-            leftBody.innerHTML = leftHTML;
+            // كل صفحة تحتوي على جدولين (اليمين 20، واليسار 20 = إجمالي 40 منتج لكل صفحة)
+            const itemsPerSheet = 40;
+            const itemsPerTable = 20;
 
-            let rightHTML = '';
-            rightProducts.forEach((prod, idx) => {
-                let serialNum = midPoint + idx + 1; // الترتيب التسلسلي يكمل مباشرة في الجدول الأيسر
-                rightHTML += `<tr>
-                    <td class="col-num">${serialNum}</td>
-                    <td class="col-name">${prod}</td>
-                    <td class="col-empty"><input type="text" placeholder=""></td>
-                    <td class="col-empty"><input type="text" placeholder=""></td>
-                    <td class="col-empty"><input type="text" placeholder=""></td>
-                </tr>`;
-            });
-            rightBody.innerHTML = rightHTML;
+            for (let i = 0; i < productsList.length; i += itemsPerSheet) {
+                let sheetDiv = document.createElement('div');
+                sheetDiv.className = 'page-sheet';
+
+                // بيانات الجدول الأيمن (أول 20 عنصراً في الصفحة)
+                let rightProducts = productsList.slice(i, i + itemsPerTable);
+                // بيانات الجدول الأيسر (العشرين عنصراً التالية في نفس الصفحة)
+                let leftProducts = productsList.slice(i + itemsPerTable, i + itemsPerSheet);
+
+                // بناء الجدول الأيمن
+                let rightHTML = `<div class="table-box"><table><thead><tr>
+                    <th class="col-num">رقم</th>
+                    <th class="col-name">اسم المنتج</th>
+                    <th class="col-empty"></th>
+                    <th class="col-empty"></th>
+                    <th class="col-empty"></th>
+                </tr></thead><tbody>`;
+
+                rightProducts.forEach((prod, idx) => {
+                    let serialNum = i + idx + 1;
+                    rightHTML += `<tr>
+                        <td class="col-num">${serialNum}</td>
+                        <td class="col-name">${prod}</td>
+                        <td class="col-empty"><input type="text"></td>
+                        <td class="col-empty"><input type="text"></td>
+                        <td class="col-empty"><input type="text"></td>
+                    </tr>`;
+                });
+                // إذا كانت المنتجات أقل من 20 في الجدول الأيمن، نكمل الأسطر فارغة للحفاظ على التنسيق
+                for (let r = rightProducts.length; r < itemsPerTable; r++) {
+                    let serialNum = i + r + 1;
+                    rightHTML += `<tr>
+                        <td class="col-num">${serialNum}</td>
+                        <td class="col-name"></td>
+                        <td class="col-empty"><input type="text"></td>
+                        <td class="col-empty"><input type="text"></td>
+                        <td class="col-empty"><input type="text"></td>
+                    </tr>`;
+                }
+                rightHTML += `</tbody></table></div>`;
+
+                // بناء الجدول الأيسر
+                let leftHTML = `<div class="table-box"><table><thead><tr>
+                    <th class="col-num">رقم</th>
+                    <th class="col-name">اسم المنتج</th>
+                    <th class="col-empty"></th>
+                    <th class="col-empty"></th>
+                    <th class="col-empty"></th>
+                </tr></thead><tbody>`;
+
+                leftProducts.forEach((prod, idx) => {
+                    let serialNum = i + itemsPerTable + idx + 1;
+                    leftHTML += `<tr>
+                        <td class="col-num">${serialNum}</td>
+                        <td class="col-name">${prod}</td>
+                        <td class="col-empty"><input type="text"></td>
+                        <td class="col-empty"><input type="text"></td>
+                        <td class="col-empty"><input type="text"></td>
+                    </tr>`;
+                });
+                // تكملة الأسطر الفارغة للجدول الأيسر إن وجدت
+                for (let l = leftProducts.length; l < itemsPerTable; l++) {
+                    let serialNum = i + itemsPerTable + l + 1;
+                    leftHTML += `<tr>
+                        <td class="col-num">${serialNum <= productsList.length ? serialNum : ''}</td>
+                        <td class="col-name"></td>
+                        <td class="col-empty"><input type="text"></td>
+                        <td class="col-empty"><input type="text"></td>
+                        <td class="col-empty"><input type="text"></td>
+                    </tr>`;
+                }
+                leftHTML += `</tbody></table></div>`;
+
+                sheetDiv.innerHTML = rightHTML + leftHTML;
+                container.appendChild(sheetDiv);
+            }
         }
 
-        renderDualTables();
+        generatePagedTables();
     </script>
 </body>
 </html>
